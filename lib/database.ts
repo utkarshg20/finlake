@@ -92,6 +92,7 @@ export interface UserSubscription {
   amountPaid: number;
   billingCycle: "monthly" | "yearly" | "one-time";
   nextBillingDate?: string;
+  pricing?: AgentPricing; // Added pricing field
 }
 
 class Database {
@@ -905,6 +906,47 @@ class Database {
         sub.status === "active",
     );
     return !!subscription;
+  }
+
+  // Add subscription method
+  subscribeToAgent(userId: string, agentId: string): boolean {
+    try {
+      const subscriptions = this.getUserSubscriptions(userId);
+      const existingSubscription = subscriptions.find(
+        (sub) => sub.agentId === agentId,
+      );
+
+      if (existingSubscription) {
+        console.log("User already subscribed to this agent");
+        return true;
+      }
+
+      // Create new subscription
+      const newSubscription: UserSubscription = {
+        id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId,
+        agentId,
+        status: "active",
+        subscribedAt: new Date().toISOString(),
+        expiresAt: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000,
+        ).toISOString(), // 30 days from now
+        pricing: {
+          subscriptionFee: 0, // Will be set based on agent pricing
+          currency: "USD",
+          billingCycle: "monthly",
+        },
+      };
+
+      subscriptions.push(newSubscription);
+      this.setUserSubscriptions(userId, subscriptions);
+
+      console.log(`User ${userId} subscribed to agent ${agentId}`);
+      return true;
+    } catch (error) {
+      console.error("Error subscribing to agent:", error);
+      return false;
+    }
   }
 
   // Helper methods
