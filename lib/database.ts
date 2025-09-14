@@ -316,6 +316,8 @@ class Database {
             Date.now() - 90 * 24 * 60 * 60 * 1000,
           ).toISOString(), // 3 months ago
           lastActive: new Date().toISOString(),
+          strategyPrompt:
+            "Monitor equity market momentum using RSI and MACD indicators. Execute trades when momentum shifts align with volume spikes and market sentiment.",
           tradingLogicPrompt:
             "Monitor equity market momentum using RSI and MACD indicators. Execute trades when momentum shifts align with volume spikes and market sentiment.",
           parameters: {
@@ -361,6 +363,8 @@ class Database {
             Date.now() - 60 * 24 * 60 * 60 * 1000,
           ).toISOString(), // 2 months ago
           lastActive: new Date().toISOString(),
+          strategyPrompt:
+            "Analyze news sentiment and social media buzz for major stocks. Execute trades based on sentiment shifts and volume confirmation.",
           tradingLogicPrompt:
             "Analyze news sentiment and social media buzz for major stocks. Execute trades based on sentiment shifts and volume confirmation.",
           parameters: {
