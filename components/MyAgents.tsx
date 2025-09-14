@@ -20,7 +20,7 @@ import {
 } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/contexts/AppContext";
-import { Agent } from "@/types/agent";
+import { Agent } from "@/lib/database";
 
 const MyAgents = () => {
   const { userAgents, updateAgent, deleteAgent, isLoading } = useApp();
