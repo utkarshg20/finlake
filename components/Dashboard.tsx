@@ -34,9 +34,18 @@ export default function Dashboard() {
   const { currentUser, userAgents, signals, getPortfolioHistory, isLoading } =
     useApp();
   const [selectedTimeframe, setSelectedTimeframe] = useState("30D");
+  const [portfolioData, setPortfolioData] = useState<any[]>([]);
 
-  // Generate portfolio history data for the chart
-  const portfolioData = getPortfolioHistory(currentUser?.id || "", 30);
+  // Load portfolio data on mount
+  useEffect(() => {
+    const loadPortfolioData = async () => {
+      if (currentUser?.id) {
+        const data = await getPortfolioHistory(currentUser.id, 30);
+        setPortfolioData(data);
+      }
+    };
+    loadPortfolioData();
+  }, [currentUser?.id, getPortfolioHistory]);
 
   // Debug logging
   console.log("Portfolio data:", portfolioData);
@@ -52,211 +61,74 @@ export default function Dashboard() {
   const maxValue = values.length > 0 ? Math.max(...values) : 10000;
   const range = maxValue - minValue;
   const padding = range * 0.1; // 10% padding
-  const chartMin = minValue - padding;
-  const chartMax = maxValue + padding;
-  const chartRange = chartMax - chartMin;
+  const yMin = Math.max(0, minValue - padding);
+  const yMax = maxValue + padding;
+
+  // Chart dimensions - use actual container dimensions
+  const chartWidth = 600;
+  const chartHeight = 300;
+  const margin = { top: 20, right: 20, bottom: 40, left: 80 };
+  const innerWidth = chartWidth - margin.left - margin.right;
+  const innerHeight = chartHeight - margin.top - margin.bottom;
+
+  // Scale functions
+  const xScale = (index: number) =>
+    (index / Math.max(1, chartData.length - 1)) * innerWidth;
+  const yScale = (value: number) =>
+    innerHeight - ((value - yMin) / (yMax - yMin)) * innerHeight;
 
   // Generate SVG path for the line
   const generatePath = () => {
-    if (chartData.length < 2) return "";
+    if (chartData.length === 0) return "";
 
-    const width = 400;
-    const height = 200;
-    const padding = 20;
+    const points = chartData
+      .map((d, index) => {
+        const x = xScale(index);
+        const y = yScale(d.value);
+        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+      })
+      .join(" ");
 
-    const points = chartData.map((point, index) => {
-      const x =
-        padding +
-        (index / Math.max(chartData.length - 1, 1)) * (width - 2 * padding);
-      const y =
-        padding +
-        height -
-        padding -
-        ((point.value - chartMin) / chartRange) * (height - 2 * padding);
-      return `${x},${y}`;
-    });
-
-    return `M ${points.join(" L ")}`;
+    return points;
   };
 
-  // Generate area path (same as line but closed at bottom)
+  // Generate area path for gradient fill
   const generateAreaPath = () => {
-    if (chartData.length < 2) return "";
+    if (chartData.length === 0) return "";
 
-    const width = 400;
-    const height = 200;
-    const padding = 20;
+    const points = chartData
+      .map((d, index) => {
+        const x = xScale(index);
+        const y = yScale(d.value);
+        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+      })
+      .join(" ");
 
-    const points = chartData.map((point, index) => {
-      const x =
-        padding +
-        (index / Math.max(chartData.length - 1, 1)) * (width - 2 * padding);
-      const y =
-        padding +
-        height -
-        padding -
-        ((point.value - chartMin) / chartRange) * (height - 2 * padding);
-      return `${x},${y}`;
-    });
-
-    const firstPoint = points[0];
-    const lastPoint = points[points.length - 1];
-    const bottomLeft = `${padding},${height - padding}`;
-    const bottomRight = `${width - padding},${height - padding}`;
-
-    return `M ${firstPoint} L ${points.join(" L ")} L ${bottomRight} L ${bottomLeft} Z`;
+    return `${points} L ${xScale(chartData.length - 1)} ${innerHeight} L ${xScale(0)} ${innerHeight} Z`;
   };
 
-  // Calculate portfolio metrics with null checks
-  const currentValue =
-    chartData.length > 0 ? chartData[chartData.length - 1]?.value : 0;
-  const initialValue = chartData.length > 0 ? chartData[0]?.value : 0;
-  const totalReturn =
-    initialValue > 0 ? ((currentValue - initialValue) / initialValue) * 100 : 0;
-  const todayReturn =
-    chartData.length > 0 ? chartData[chartData.length - 1]?.dailyReturn : 0;
+  // Calculate metrics
+  const totalSignals = signals.length;
+  const successfulSignals = signals.filter((s) => s.return > 0).length;
+  const successRate =
+    totalSignals > 0 ? (successfulSignals / totalSignals) * 100 : 0;
+  const totalSubscribers = userAgents.reduce(
+    (sum, agent) => sum + (agent.performance?.totalSubscribers || 0),
+    0,
+  );
+  const publicAgents = userAgents.filter(
+    (agent) => agent.visibility === "public",
+  ).length;
 
-  // Calculate other metrics with null checks
-  const totalSignals =
-    signals && userAgents
-      ? signals.filter((s) => userAgents.some((a) => a.id === s.agentId)).length
-      : 0;
-  const activeAgents = userAgents
-    ? userAgents.filter((a) => a.status === "active").length
-    : 0;
-  const avgSuccessRate =
-    userAgents && userAgents.length > 0
-      ? userAgents.reduce(
-          (sum, agent) => sum + (agent.performance?.successRate || 0),
-          0,
-        ) / userAgents.length
-      : 0;
+  // Recent activity (last 5 signals)
+  const recentSignals = signals
+    .sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    )
+    .slice(0, 5);
 
-  // Updated renderChart function
-  const renderChart = () => {
-    console.log("Rendering chart with data:", chartData);
-
-    if (chartData.length === 0) {
-      return (
-        <div className="flex items-center justify-center h-full text-gray-400">
-          <p>No portfolio data available</p>
-        </div>
-      );
-    }
-
-    if (chartData.length < 2) {
-      return (
-        <div className="flex items-center justify-center h-full text-gray-400">
-          <p>Not enough data points for chart</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative w-full h-full">
-        <svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 400 300"
-          className="overflow-visible"
-        >
-          {/* Grid lines */}
-          <defs>
-            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop
-                offset="0%"
-                stopColor="rgb(59, 130, 246)"
-                stopOpacity="0.3"
-              />
-              <stop
-                offset="100%"
-                stopColor="rgb(59, 130, 246)"
-                stopOpacity="0.05"
-              />
-            </linearGradient>
-          </defs>
-
-          {/* Y-axis grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, index) => {
-            const y = 20 + ratio * 260;
-            const value = chartMin + (1 - ratio) * chartRange;
-            return (
-              <g key={index}>
-                <line
-                  x1="20"
-                  y1={y}
-                  x2="380"
-                  y2={y}
-                  stroke="rgb(55, 65, 81)"
-                  strokeWidth="1"
-                />
-                <text
-                  x="15"
-                  y={y + 4}
-                  fill="rgb(156, 163, 175)"
-                  fontSize="12"
-                  textAnchor="end"
-                >
-                  ${value.toLocaleString()}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* X-axis grid lines */}
-          {chartData.map((_, index) => {
-            if (
-              chartData.length > 1 &&
-              index % Math.ceil(chartData.length / 6) === 0
-            ) {
-              const x = 20 + (index / Math.max(chartData.length - 1, 1)) * 360;
-              const date = new Date(chartData[index].date);
-              return (
-                <g key={index}>
-                  <line
-                    x1={x}
-                    y1="20"
-                    x2={x}
-                    y2="280"
-                    stroke="rgb(55, 65, 81)"
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={x}
-                    y="295"
-                    fill="rgb(156, 163, 175)"
-                    fontSize="10"
-                    textAnchor="middle"
-                  >
-                    {date.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </text>
-                </g>
-              );
-            }
-            return null;
-          })}
-
-          {/* Area under the curve */}
-          <path d={generateAreaPath()} fill="url(#areaGradient)" />
-
-          {/* Line */}
-          <path
-            d={generatePath()}
-            fill="none"
-            stroke="rgb(59, 130, 246)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    );
-  };
-
-  if (isLoading || !currentUser) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
@@ -268,164 +140,289 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto p-6">
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-            <p className="text-gray-400">Welcome back, {currentUser?.name}</p>
+            <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+            <p className="text-gray-400">
+              Welcome back, {currentUser?.name || "Trader"}
+            </p>
           </div>
-          <Button
-            onClick={() => (window.location.href = "/create-agent")}
-            className="bg-white text-black hover:bg-gray-100"
-          >
-            <FiPlus className="w-4 h-4 mr-2" />
-            Create Agent
-          </Button>
+          <div className="flex space-x-4">
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-gray-800 hover:bg-gray-700 text-white"
+            >
+              <FiRefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+            <Button
+              onClick={() => (window.location.href = "/create-agent")}
+              className="bg-white text-black hover:bg-gray-100"
+            >
+              <FiPlus className="w-4 h-4 mr-2" />
+              Create Agent
+            </Button>
+          </div>
         </div>
 
-        {/* Main Dashboard Content */}
+        {/* Timeframe Selector */}
+        <div className="flex space-x-2 mb-6">
+          {["7D", "30D", "90D", "1Y"].map((timeframe) => (
+            <Button
+              key={timeframe}
+              onClick={() => setSelectedTimeframe(timeframe)}
+              className={`px-4 py-2 rounded-lg ${
+                selectedTimeframe === timeframe
+                  ? "bg-white text-black"
+                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+              }`}
+            >
+              {timeframe}
+            </Button>
+          ))}
+        </div>
+
+        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Left Side - Chart */}
+          {/* Portfolio Performance Chart - Left Side (3/5 width) */}
           <div className="lg:col-span-3">
-            {/* Portfolio Performance Chart */}
-            <div className="bg-gray-900 rounded-lg p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-white">
-                  Portfolio Performance
-                </h3>
-                <div className="flex space-x-2">
-                  <button className="px-3 py-1 bg-blue-600 text-white text-sm rounded">
-                    30D
-                  </button>
-                  <button className="px-3 py-1 bg-gray-700 text-gray-300 text-sm rounded hover:bg-gray-600">
-                    90D
-                  </button>
-                  <button className="px-3 py-1 bg-gray-700 text-gray-300 text-sm rounded hover:bg-gray-600">
-                    1Y
-                  </button>
+            <Card className="bg-gray-900 border-gray-700 p-6 h-full">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Portfolio Performance</h2>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <FiActivity className="w-4 h-4" />
+                  <span>Live</span>
                 </div>
               </div>
 
-              <div className="h-80">{renderChart()}</div>
-            </div>
+              {chartData.length > 0 ? (
+                <div className="h-full">
+                  <svg
+                    width="100%"
+                    height="100%"
+                    viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                    className="w-full h-64"
+                  >
+                    {/* Gradient definition */}
+                    <defs>
+                      <linearGradient
+                        id="portfolioGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="0%"
+                        y2="100%"
+                      >
+                        <stop offset="0%" stopColor="rgba(34, 197, 94, 0.3)" />
+                        <stop
+                          offset="100%"
+                          stopColor="rgba(34, 197, 94, 0.05)"
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Grid lines */}
+                    <g className="opacity-20">
+                      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                        const y = margin.top + ratio * innerHeight;
+                        const value = yMax - ratio * (yMax - yMin);
+                        return (
+                          <g key={ratio}>
+                            <line
+                              x1={margin.left}
+                              y1={y}
+                              x2={margin.left + innerWidth}
+                              y2={y}
+                              stroke="currentColor"
+                              strokeWidth="1"
+                            />
+                            <text
+                              x={margin.left - 10}
+                              y={y + 4}
+                              textAnchor="end"
+                              className="text-xs fill-gray-400"
+                            >
+                              ${value.toFixed(0)}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </g>
+
+                    {/* Area fill */}
+                    <path
+                      d={generateAreaPath()}
+                      fill="url(#portfolioGradient)"
+                      transform={`translate(${margin.left}, ${margin.top})`}
+                    />
+
+                    {/* Line */}
+                    <path
+                      d={generatePath()}
+                      fill="none"
+                      stroke="#22c55e"
+                      strokeWidth="2"
+                      transform={`translate(${margin.left}, ${margin.top})`}
+                    />
+
+                    {/* X-axis labels */}
+                    <g
+                      transform={`translate(${margin.left}, ${margin.top + innerHeight + 10})`}
+                    >
+                      {chartData.map((d, index) => {
+                        if (index % Math.ceil(chartData.length / 5) === 0) {
+                          const date = new Date(d.date);
+                          return (
+                            <text
+                              key={index}
+                              x={xScale(index)}
+                              y={0}
+                              textAnchor="middle"
+                              className="text-xs fill-gray-400"
+                            >
+                              {date.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </text>
+                          );
+                        }
+                        return null;
+                      })}
+                    </g>
+                  </svg>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <FiBarChart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No portfolio data available</p>
+                    <p className="text-sm">Create an agent to start trading</p>
+                  </div>
+                </div>
+              )}
+            </Card>
           </div>
 
-          {/* Right Side - Metrics Stacked */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* Metrics - Right Side (2/5 width) */}
+          <div className="lg:col-span-2 space-y-6">
             {/* Total Signals */}
-            <div className="bg-gray-900 rounded-lg p-6">
+            <Card className="bg-gray-900 border-gray-700 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Total Signals</p>
-                  <p className="text-2xl font-bold text-white">
-                    {signals?.length || 0}
-                  </p>
+                  <p className="text-2xl font-bold">{totalSignals}</p>
                 </div>
-                <FiBarChart className="w-8 h-8 text-white" />
+                <div className="p-3 bg-blue-500/20 rounded-lg">
+                  <FiZap className="w-6 h-6 text-blue-400" />
+                </div>
               </div>
-            </div>
+            </Card>
 
             {/* Success Rate */}
-            <div className="bg-gray-900 rounded-lg p-6">
+            <Card className="bg-gray-900 border-gray-700 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Success Rate</p>
-                  <p className="text-2xl font-bold text-green-400">
-                    {signals && signals.length > 0
-                      ? Math.round(
-                          (signals.filter((s) => s.return > 0).length /
-                            signals.length) *
-                            100 *
-                            10,
-                        ) / 10
-                      : 0}
-                    %
+                  <p className="text-2xl font-bold">
+                    {successRate.toFixed(1)}%
                   </p>
                 </div>
-                <FiCheck className="w-8 h-8 text-green-400" />
+                <div className="p-3 bg-green-500/20 rounded-lg">
+                  <FiTrendingUp className="w-6 h-6 text-green-400" />
+                </div>
               </div>
-            </div>
+            </Card>
 
             {/* Subscribers */}
-            <div className="bg-gray-900 rounded-lg p-6">
+            <Card className="bg-gray-900 border-gray-700 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Subscribers</p>
-                  <p className="text-2xl font-bold text-white">
-                    {userAgents?.reduce(
-                      (sum, agent) =>
-                        sum + (agent.performance?.totalSubscribers || 0),
-                      0,
-                    ) || 0}
-                  </p>
+                  <p className="text-2xl font-bold">{totalSubscribers}</p>
                 </div>
-                <FiUsers className="w-8 h-8 text-purple-400" />
+                <div className="p-3 bg-purple-500/20 rounded-lg">
+                  <FiUsers className="w-6 h-6 text-purple-400" />
+                </div>
               </div>
-            </div>
+            </Card>
 
             {/* Public Agents */}
-            <div className="bg-gray-900 rounded-lg p-6">
+            <Card className="bg-gray-900 border-gray-700 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Public Agents</p>
-                  <p className="text-2xl font-bold text-white">
-                    {userAgents?.filter(
-                      (agent) => agent.visibility === "public",
-                    ).length || 0}
-                  </p>
+                  <p className="text-2xl font-bold">{publicAgents}</p>
                 </div>
-                <FiGlobe className="w-8 h-8 text-yellow-400" />
+                <div className="p-3 bg-orange-500/20 rounded-lg">
+                  <FiGlobe className="w-6 h-6 text-orange-400" />
+                </div>
               </div>
-            </div>
+            </Card>
           </div>
         </div>
 
-        {/* Bottom Section - Recent Activity */}
-        <div className="mt-6">
-          {/* Recent Activity */}
-          <div className="bg-gray-900 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              Recent Activity
-            </h3>
-            <div className="space-y-3">
-              {signals && signals.length > 0 ? (
-                signals.slice(0, 5).map((signal) => (
+        {/* Recent Activity */}
+        <div className="mt-8">
+          <Card className="bg-gray-900 border-gray-700 p-6">
+            <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+            {recentSignals.length > 0 ? (
+              <div className="space-y-3">
+                {recentSignals.map((signal) => (
                   <div
                     key={signal.id}
                     className="flex items-center justify-between p-3 bg-gray-800 rounded-lg"
                   >
-                    <div>
-                      <p className="text-white font-medium">
-                        {signal.action.toUpperCase()} {signal.entity}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {signal.confidence
-                          ? `${Math.round(signal.confidence * 100)}% confidence`
-                          : "No confidence data"}
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`p-2 rounded-full ${
+                          signal.action === "buy"
+                            ? "bg-green-500/20"
+                            : "bg-red-500/20"
+                        }`}
+                      >
+                        {signal.action === "buy" ? (
+                          <FiArrowUp className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <FiArrowDown className="w-4 h-4 text-red-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{signal.entity}</p>
+                        <p className="text-sm text-gray-400">
+                          {signal.action.toUpperCase()} • Confidence:{" "}
+                          {(signal.confidence * 100).toFixed(0)}%
+                        </p>
+                      </div>
                     </div>
                     <div className="text-right">
                       <p
-                        className={`font-semibold ${signal.return >= 0 ? "text-green-400" : "text-red-400"}`}
+                        className={`font-medium ${
+                          signal.return > 0 ? "text-green-400" : "text-red-400"
+                        }`}
                       >
-                        {signal.return >= 0 ? "+" : ""}
+                        {signal.return > 0 ? "+" : ""}
                         {signal.return.toFixed(2)}%
                       </p>
-                      <p className="text-gray-400 text-sm">
+                      <p className="text-sm text-gray-400">
                         {new Date(signal.timestamp).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-gray-400 text-center py-4">
-                  No recent activity
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <FiActivity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No recent activity</p>
+                <p className="text-sm">
+                  Your agents will appear here when they generate signals
                 </p>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </Card>
         </div>
       </div>
     </div>

@@ -41,7 +41,7 @@ interface AppContextType {
   updateAgent: (id: string, updates: Partial<Agent>) => Promise<boolean>;
   deleteAgent: (id: string) => Promise<boolean>;
   subscribeToAgent: (agentId: string) => Promise<boolean>;
-  isUserSubscribed: (agentId: string) => boolean;
+  isUserSubscribed: (agentId: string) => Promise<boolean>;
 
   // Signal state
   signals: Signal[];
@@ -50,7 +50,10 @@ interface AppContextType {
   ) => Promise<Signal | null>;
 
   // Portfolio state
-  getPortfolioHistory: (userId: string, days?: number) => PortfolioHistory[];
+  getPortfolioHistory: (
+    userId: string,
+    days?: number,
+  ) => Promise<PortfolioHistory[]>;
 
   // Dashboard state
   dashboardData: any;
@@ -85,27 +88,33 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   // Load user from localStorage on mount
   useEffect(() => {
-    const savedLoginState = localStorage.getItem("finlake-login");
-    if (savedLoginState) {
-      const { isLoggedIn: savedIsLoggedIn, userId: savedUserId } =
-        JSON.parse(savedLoginState);
-      if (savedIsLoggedIn && savedUserId) {
-        const user = db.getUserById(savedUserId);
-        if (user) {
-          setCurrentUser(user);
-          setIsLoggedIn(true);
-          loadUserData(user.id);
+    const loadUser = async () => {
+      const savedLoginState = localStorage.getItem("finlake-login");
+      if (savedLoginState) {
+        const { isLoggedIn: savedIsLoggedIn, userId: savedUserId } =
+          JSON.parse(savedLoginState);
+        if (savedIsLoggedIn && savedUserId) {
+          const user = await db.getUserById(savedUserId);
+          if (user) {
+            setCurrentUser(user);
+            setIsLoggedIn(true);
+            loadUserData(user.id);
+          }
         }
       }
-    }
+    };
+    loadUser();
   }, []);
 
-  const loadUserData = (userId: string) => {
+  const loadUserData = async (userId: string) => {
     console.log("Loading data for user ID:", userId);
-    const agents = db.getAgentsByUserId(userId);
-    const signals = db.getSignalsByUserId(userId);
-    const publicAgents = db.getPublicAgents();
-    const dashboardData = db.getDashboardData(userId);
+    const agents = await db.getAgentsByUserId(userId);
+    const signals = await db.getSignalsByUserId(userId);
+    const allAgents = await db.getAgents();
+    const publicAgents = allAgents.filter(
+      (agent) => agent.visibility === "public",
+    );
+    const dashboardData = await db.getDashboardData(userId);
 
     console.log("Found agents:", agents);
     console.log("Found signals:", signals);
@@ -126,7 +135,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     try {
       console.log("Attempting login for email:", email);
-      const user = db.authenticateUser(email, password);
+      const user = await db.authenticateUser(email, password);
       console.log("Login result:", user);
 
       if (user) {
@@ -163,7 +172,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
-      const user = db.registerUser(userData);
+      const user = await db.registerUser(userData);
 
       if (user) {
         setCurrentUser(user);
@@ -204,11 +213,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     if (!currentUser) return false;
 
     try {
-      const updatedUser = db.updateUser(currentUser.id, updates);
-      if (updatedUser) {
-        setCurrentUser(updatedUser);
-        return true;
-      }
+      // Note: updateUser method doesn't exist in database, so we'll skip this for now
+      // const updatedUser = db.updateUser(currentUser.id, updates);
+      // if (updatedUser) {
+      //   setCurrentUser(updatedUser);
+      //   return true;
+      // }
       return false;
     } catch (error) {
       console.error("Update user error:", error);
@@ -228,15 +238,17 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       console.log("Creating agent with data:", agentData);
       console.log("Current user ID:", currentUser.id);
 
-      const agent = db.createAgent({
+      const agent = await db.createAgent({
         ...agentData,
         userId: currentUser.id,
       });
 
       console.log("Created agent:", agent);
 
-      setUserAgents((prev) => [...prev, agent]);
-      refreshDashboardData();
+      if (agent) {
+        setUserAgents((prev) => [...prev, agent]);
+        refreshDashboardData();
+      }
 
       return agent;
     } catch (error) {
@@ -250,7 +262,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     updates: Partial<Agent>,
   ): Promise<boolean> => {
     try {
-      const success = db.updateAgent(id, updates);
+      const success = await db.updateAgent(id, updates);
       if (success) {
         setUserAgents((prev) =>
           prev.map((agent) =>
@@ -269,7 +281,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const deleteAgent = async (id: string): Promise<boolean> => {
     try {
-      const success = db.deleteAgent(id);
+      const success = await db.deleteAgent(id);
       if (success) {
         setUserAgents((prev) => prev.filter((agent) => agent.id !== id));
         refreshDashboardData();
@@ -286,9 +298,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     signalData: Omit<Signal, "id" | "timestamp">,
   ): Promise<Signal | null> => {
     try {
-      const signal = db.createSignal(signalData);
-      setUserSignals((prev) => [...prev, signal]);
-      refreshDashboardData();
+      const signal = await db.createSignal(signalData);
+      if (signal) {
+        setUserSignals((prev) => [...prev, signal]);
+        refreshDashboardData();
+      }
       return signal;
     } catch (error) {
       console.error("Create signal error:", error);
@@ -296,9 +310,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  const refreshDashboardData = () => {
+  const refreshDashboardData = async () => {
     if (currentUser) {
-      const data = db.getDashboardData(currentUser.id);
+      const data = await db.getDashboardData(currentUser.id);
       setDashboardData(data);
     }
   };
@@ -306,7 +320,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const subscribeToAgent = async (agentId: string): Promise<boolean> => {
     if (!currentUser) return false;
     try {
-      const success = db.subscribeToAgent(currentUser.id, agentId);
+      const success = await db.subscribeToAgent(currentUser.id, agentId);
       if (success) {
         setUserAgents((prev) =>
           prev.map((agent) =>
@@ -332,14 +346,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  // Add the isUserSubscribed function
-  const isUserSubscribed = (agentId: string): boolean => {
+  const isUserSubscribed = async (agentId: string): Promise<boolean> => {
     if (!currentUser) return false;
-    return db.isUserSubscribed(currentUser.id, agentId);
+    return await db.isUserSubscribed(currentUser.id, agentId);
   };
 
-  const getPortfolioHistory = (userId: string, days: number = 30) => {
-    return db.getPortfolioHistory(userId, days);
+  const getPortfolioHistory = async (
+    userId: string,
+    days: number = 30,
+  ): Promise<PortfolioHistory[]> => {
+    return await db.getPortfolioHistory(userId, days);
   };
 
   const value: AppContextType = {
