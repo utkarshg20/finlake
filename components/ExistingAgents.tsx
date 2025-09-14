@@ -103,80 +103,157 @@ const ExistingAgents = () => {
       key={agent.id}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:border-gray-600 transition-colors"
+      className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-5 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 group backdrop-blur-sm h-full flex flex-col"
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-blue-500/20 rounded-lg">
-            <FiUsers className="w-5 h-5 text-blue-400" />
+      {/* Header Section */}
+      <div className="flex justify-between items-start mb-5">
+        <div className="flex items-center space-x-3 min-w-0 flex-1">
+          <div className="relative flex-shrink-0">
+            <div className="p-3 bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-indigo-500/20 rounded-xl group-hover:from-blue-500/30 group-hover:via-purple-500/30 group-hover:to-indigo-500/30 transition-all duration-500">
+              <FiUsers className="w-5 h-5 text-blue-400 group-hover:text-blue-300 transition-colors" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-gray-900"></div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white">{agent.name}</h3>
-            <p className="text-sm text-gray-400">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors duration-300 truncate">
+              {agent.name}
+            </h3>
+            <p className="text-xs text-gray-400 font-medium">
               {isPersonal ? "Personal Agent" : "Public Agent"}
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
           <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
+            className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
               agent.status === "active"
-                ? "bg-green-500/20 text-green-400"
-                : "bg-yellow-500/20 text-yellow-400"
+                ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
             }`}
           >
             {agent.status}
           </span>
           {agent.visibility === "public" && (
-            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-medium">
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-bold uppercase tracking-wide border border-blue-500/40">
+              <FiGlobe className="w-3 h-3 inline mr-1" />
               Public
             </span>
           )}
         </div>
       </div>
 
-      <p className="text-gray-300 mb-4 line-clamp-2">{agent.description}</p>
+      {/* Description */}
+      <p className="text-gray-300 mb-6 line-clamp-2 leading-relaxed text-sm flex-1">
+        {agent.description}
+      </p>
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-4 text-sm text-gray-400">
-          <div className="flex items-center space-x-1">
-            <FiTrendingUp className="w-4 h-4" />
-            <span>{agent.performance?.successRate?.toFixed(1) || 0}%</span>
+      {/* Performance Metrics Grid */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center p-3 bg-gray-800/50 rounded-lg border border-gray-700/50 group-hover:border-blue-500/30 transition-all duration-300">
+          <div className="text-xl font-bold text-white mb-1">
+            {agent.performance?.totalSignals || 0}
           </div>
-          <div className="flex items-center space-x-1">
-            <FiUsers className="w-4 h-4" />
-            <span>{agent.performance?.totalSubscribers || 0}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <FiClock className="w-4 h-4" />
-            <span>{new Date(agent.lastActive).toLocaleDateString()}</span>
+          <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+            Signals
           </div>
         </div>
-        {!isPersonal && agent.pricing && (
-          <div className="text-right">
-            <p className="text-lg font-semibold text-white">
-              {formatPrice(agent.pricing)}
-            </p>
+        <div className="text-center p-3 bg-gray-800/50 rounded-lg border border-gray-700/50 group-hover:border-green-500/30 transition-all duration-300">
+          <div className="text-xl font-bold text-green-400 mb-1">
+            {agent.performance?.successRate?.toFixed(1) || 0}%
           </div>
+          <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+            Success
+          </div>
+        </div>
+        <div className="text-center p-3 bg-gray-800/50 rounded-lg border border-gray-700/50 group-hover:border-purple-500/30 transition-all duration-300">
+          <div className="text-xl font-bold text-purple-400 mb-1">
+            {agent.performance?.totalSubscribers || 0}
+          </div>
+          <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
+            Subscribers
+          </div>
+        </div>
+      </div>
+
+      {/* Tags Section */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {agent.tags?.slice(0, 3).map((tag: string, index: number) => (
+          <span
+            key={index}
+            className="px-2 py-1 bg-gradient-to-r from-gray-700/80 to-gray-600/80 text-gray-300 rounded-md text-xs font-medium border border-gray-600/50 hover:from-blue-500/20 hover:to-purple-500/20 hover:text-blue-300 hover:border-blue-500/30 transition-all duration-300"
+          >
+            {tag}
+          </span>
+        ))}
+        {agent.tags?.length > 3 && (
+          <span className="px-2 py-1 bg-gray-700/50 text-gray-400 rounded-md text-xs font-medium border border-gray-600/30">
+            +{agent.tags.length - 3} more
+          </span>
         )}
       </div>
 
-      <div className="flex space-x-2">
-        <Button
-          onClick={() => handleUseAgent(agent)}
-          className="flex-1 bg-white text-black hover:bg-gray-100"
-        >
-          <FiEye className="w-4 h-4 mr-2" />
-          {isPersonal ? "View Details" : "Use Agent"}
-        </Button>
-        {!isPersonal && (
-          <Button
-            onClick={() => handleUseAgent(agent)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <FiDollarSign className="w-4 h-4" />
-          </Button>
-        )}
+      {/* Footer Section */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-700/50 mt-auto">
+        <div className="flex items-center space-x-4">
+          {agent.pricing ? (
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-green-500/20 rounded-lg">
+                <FiDollarSign className="w-3 h-3 text-green-400" />
+              </div>
+              <span className="text-green-400 font-bold text-sm">
+                {formatPrice(agent.pricing)}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-gray-500/20 rounded-lg">
+                <FiShield className="w-3 h-3 text-gray-400" />
+              </div>
+              <span className="text-gray-400 font-semibold text-sm">Free</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-1 text-gray-400">
+          <FiClock className="w-3 h-3" />
+          <span className="text-xs font-medium">
+            {new Date(agent.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          {isPersonal ? (
+            <Button
+              onClick={() => router.push("/dashboard")}
+              className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/30 transform hover:scale-105"
+            >
+              <FiTrendingUp className="w-4 h-4 mr-1" />
+              Dashboard
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleUseAgent(agent)}
+              disabled={subscriptionStatus[agent.id]}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${
+                subscriptionStatus[agent.id]
+                  ? "bg-green-600 text-white cursor-not-allowed shadow-lg shadow-green-500/20"
+                  : "bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white hover:shadow-2xl hover:shadow-blue-500/30 transform hover:scale-105"
+              }`}
+            >
+              {subscriptionStatus[agent.id] ? (
+                <>
+                  <FiCheck className="w-4 h-4 mr-1" />
+                  Subscribed
+                </>
+              ) : (
+                <>
+                  <FiPlay className="w-4 h-4 mr-1" />
+                  Subscribe
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
     </motion.div>
   );

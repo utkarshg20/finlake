@@ -1224,7 +1224,9 @@ export default function CreateAgent() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Create AI Agent</h1>
           <p className="text-gray-400">
-            Step {currentStep} of 5: {getStepTitle(currentStep)}
+            {currentStep === 6
+              ? "Success"
+              : `Step ${currentStep} of 5: ${getStepTitle(currentStep)}`}
           </p>
         </div>
 
@@ -1235,7 +1237,9 @@ export default function CreateAgent() {
               <div
                 key={step}
                 className={`h-2 flex-1 rounded ${
-                  step <= currentStep ? "bg-white" : "bg-gray-700"
+                  step <= (currentStep === 6 ? 5 : currentStep)
+                    ? "bg-white"
+                    : "bg-gray-700"
                 }`}
               />
             ))}

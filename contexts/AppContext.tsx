@@ -135,6 +135,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
     try {
       console.log("Attempting login for email:", email);
+
+      // Add a 2-3 second delay for better UX
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+
       const user = await db.authenticateUser(email, password);
       console.log("Login result:", user);
 

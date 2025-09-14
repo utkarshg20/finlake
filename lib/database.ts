@@ -229,9 +229,7 @@ class Database {
         type: "burst_rule",
         status: "active",
         visibility: "private",
-        createdAt: new Date(
-          Date.now() - 90 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
+        createdAt: "2025-09-11T00:00:00.000Z",
         lastActive: new Date().toISOString(),
         strategyPrompt:
           "Monitor equity market momentum using RSI and MACD indicators. Execute trades when momentum shifts align with volume spikes and market sentiment.",
@@ -253,7 +251,7 @@ class Database {
           statusOnCreate: "active",
         },
         performance: {
-          totalSignals: 156,
+          totalSignals: 2,
           successRate: 78.2,
           avgReturn: 2.4,
           totalSubscribers: 0,
@@ -270,9 +268,7 @@ class Database {
         type: "sentiment_rule",
         status: "active",
         visibility: "private",
-        createdAt: new Date(
-          Date.now() - 60 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
+        createdAt: "2025-09-11T00:00:00.000Z",
         lastActive: new Date().toISOString(),
         strategyPrompt:
           "Analyze news sentiment and social media buzz for major stocks. Execute trades based on sentiment shifts and volume confirmation.",
@@ -294,7 +290,7 @@ class Database {
           statusOnCreate: "active",
         },
         performance: {
-          totalSignals: 89,
+          totalSignals: 3,
           successRate: 71.9,
           avgReturn: 1.8,
           totalSubscribers: 0,
@@ -316,7 +312,7 @@ class Database {
         type: "burst_rule",
         status: "active",
         visibility: "public",
-        createdAt: "2024-01-15T00:00:00.000Z",
+        createdAt: "2025-09-11T00:00:00.000Z",
         lastActive: new Date().toISOString(),
         strategyPrompt:
           "Monitor price differences across exchanges and execute arbitrage trades when spreads exceed threshold.",
@@ -367,7 +363,7 @@ class Database {
         type: "burst_rule",
         status: "active",
         visibility: "public",
-        createdAt: "2024-02-01T00:00:00.000Z",
+        createdAt: "2025-09-11T00:00:00.000Z",
         lastActive: new Date().toISOString(),
         strategyPrompt:
           "Identify momentum shifts in volatile markets using technical indicators and volume analysis.",
