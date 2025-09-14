@@ -346,7 +346,7 @@ class Database {
             totalSubscribers: 0,
           },
           tags: ["equities", "momentum", "RSI", "MACD", "high-frequency"],
-          pricing: null,
+          pricing: undefined,
         },
         {
           id: "agent_aryan_002",
@@ -391,7 +391,7 @@ class Database {
             totalSubscribers: 0,
           },
           tags: ["sentiment", "news", "social-media", "AI", "stocks"],
-          pricing: null,
+          pricing: undefined,
         },
       ];
 
