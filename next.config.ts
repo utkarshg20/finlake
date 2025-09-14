@@ -4,9 +4,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Suppress COOP warnings
-  experimental: {
-    serverComponentsExternalPackages: [],
-  },
+  serverExternalPackages: [],
   async headers() {
     return [
       {
