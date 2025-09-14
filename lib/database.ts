@@ -841,27 +841,6 @@ class Database {
   }
 
   // Subscription operations
-  createSubscription(userId: string, agentId: string): Subscription {
-    const subscription: Subscription = {
-      id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId,
-      agentId,
-      subscribedAt: new Date().toISOString(),
-      isActive: true,
-    };
-    this.subscriptions.push(subscription);
-
-    // Update agent subscriber count
-    const agent = this.getAgentById(agentId);
-    if (agent) {
-      agent.performance.totalSubscribers++;
-      this.updateAgent(agentId, { performance: agent.performance });
-    }
-
-    this.saveToStorage();
-    return subscription;
-  }
-
   getSubscriptionsByUserId(userId: string): Subscription[] {
     return this.subscriptions.filter(
       (sub) => sub.userId === userId && sub.isActive,
