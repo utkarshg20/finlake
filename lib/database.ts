@@ -841,9 +841,9 @@ class Database {
   }
 
   // Subscription operations
-  getSubscriptionsByUserId(userId: string): Subscription[] {
+  getSubscriptionsByUserId(userId: string): UserSubscription[] {
     return this.subscriptions.filter(
-      (sub) => sub.userId === userId && sub.isActive,
+      (sub) => sub.userId === userId && sub.status === "active",
     );
   }
 
@@ -901,6 +901,8 @@ class Database {
         expiresAt: new Date(
           Date.now() + 30 * 24 * 60 * 60 * 1000,
         ).toISOString(), // 30 days from now
+        amountPaid: 0, // Will be set based on agent pricing
+        billingCycle: "monthly",
         pricing: {
           subscriptionFee: 0, // Will be set based on agent pricing
           currency: "USD",
@@ -908,8 +910,8 @@ class Database {
         },
       };
 
-      subscriptions.push(newSubscription);
-      this.setUserSubscriptions(userId, subscriptions);
+      this.subscriptions.push(newSubscription);
+      this.saveToStorage();
 
       console.log(`User ${userId} subscribed to agent ${agentId}`);
       return true;
