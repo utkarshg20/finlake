@@ -12,7 +12,17 @@ import {
 } from "./ui/drawer";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Upload, Image as ImageIcon, Brain, Bot, Coins, Code, Link, Workflow, GitBranch } from "lucide-react";
+import {
+  Upload,
+  Image as ImageIcon,
+  Brain,
+  Bot,
+  Coins,
+  Code,
+  Link,
+  Workflow,
+  GitBranch,
+} from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -37,8 +47,16 @@ const ICON_OPTIONS = [
   { value: "coins", label: "Coins", icon: <Coins className="w-4 h-4" /> },
   { value: "code", label: "Code", icon: <Code className="w-4 h-4" /> },
   { value: "link", label: "Link", icon: <Link className="w-4 h-4" /> },
-  { value: "workflow", label: "Workflow", icon: <Workflow className="w-4 h-4" /> },
-  { value: "gitBranch", label: "Git Branch", icon: <GitBranch className="w-4 h-4" /> },
+  {
+    value: "workflow",
+    label: "Workflow",
+    icon: <Workflow className="w-4 h-4" />,
+  },
+  {
+    value: "gitBranch",
+    label: "Git Branch",
+    icon: <GitBranch className="w-4 h-4" />,
+  },
 ] as const;
 
 type AgentType = (typeof AGENT_TYPES)[number];
@@ -82,10 +100,13 @@ export function UploadAgent({ className }: { className?: string }) {
           formData.append("image", value.image);
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/create-agent`, {
-          method: "POST",
-          body: formData,
-        });
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/create-agent`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
 
         if (!response.ok) {
           throw new Error(`Upload failed: ${response.statusText}`);
@@ -93,22 +114,31 @@ export function UploadAgent({ className }: { className?: string }) {
 
         const result = await response.json();
         console.log("Agent created, minting IP on Story Protocol:", result);
-        const ip_id = await mintAndRegisterIp(value.agentName, value.description);
+        const ip_id = await mintAndRegisterIp(
+          value.agentName,
+          value.description,
+        );
         const ip_url = `https://explorer.story.foundation/ipa/${ip_id}`;
-        window.open(ip_url, '_blank');
+        window.open(ip_url, "_blank");
         console.log("IP minted and registered on Story Protocol:", ip_url);
-        
-        const saveIpIdResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agent/${result.agent_id}/hash`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
+
+        const saveIpIdResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/agent/${result.agent_id}/hash`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ hash: ip_id }),
           },
-          body: JSON.stringify({ hash: ip_id }),
-        });
+        );
         if (!saveIpIdResponse) {
           throw new Error(`Failed to save IP ID: ${saveIpIdResponse}`);
         }
-        console.log("IP ID saved to agent!!! Here is the response:", saveIpIdResponse);
+        console.log(
+          "IP ID saved to agent!!! Here is the response:",
+          saveIpIdResponse,
+        );
         form.reset();
 
         toast.success("Agent created successfully!", {
@@ -242,8 +272,18 @@ export function UploadAgent({ className }: { className?: string }) {
                       <SelectValue placeholder="Select icon">
                         {field.state.value && (
                           <div className="flex items-center gap-2">
-                            {ICON_OPTIONS.find(opt => opt.value === field.state.value)?.icon}
-                            <span>{ICON_OPTIONS.find(opt => opt.value === field.state.value)?.label}</span>
+                            {
+                              ICON_OPTIONS.find(
+                                (opt) => opt.value === field.state.value,
+                              )?.icon
+                            }
+                            <span>
+                              {
+                                ICON_OPTIONS.find(
+                                  (opt) => opt.value === field.state.value,
+                                )?.label
+                              }
+                            </span>
                           </div>
                         )}
                       </SelectValue>

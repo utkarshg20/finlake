@@ -21,7 +21,14 @@ interface AppContextType {
   // User state
   currentUser: User | null;
   isLoggedIn: boolean;
-  login: (email: string, password?: string) => Promise<User | null>;
+  login: (email: string, password: string) => Promise<User | null>;
+  register: (userData: {
+    email: string;
+    username: string;
+    password: string;
+    name: string;
+    timezone: string;
+  }) => Promise<User | null>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => Promise<boolean>;
 
@@ -34,6 +41,7 @@ interface AppContextType {
   updateAgent: (id: string, updates: Partial<Agent>) => Promise<boolean>;
   deleteAgent: (id: string) => Promise<boolean>;
   subscribeToAgent: (agentId: string) => Promise<boolean>;
+  isUserSubscribed: (agentId: string) => boolean;
 
   // Signal state
   signals: Signal[];
@@ -75,10 +83,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     const savedLoginState = localStorage.getItem("finlake-login");
     if (savedLoginState) {
-      const { isLoggedIn: savedIsLoggedIn, userEmail: savedUserEmail } =
+      const { isLoggedIn: savedIsLoggedIn, userId: savedUserId } =
         JSON.parse(savedLoginState);
-      if (savedIsLoggedIn && savedUserEmail) {
-        const user = db.getUserByEmail(savedUserEmail);
+      if (savedIsLoggedIn && savedUserId) {
+        const user = db.getUserById(savedUserId);
         if (user) {
           setCurrentUser(user);
           setIsLoggedIn(true);
@@ -98,6 +106,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     console.log("Found agents:", agents);
     console.log("Found signals:", signals);
     console.log("Found public agents:", publicAgents);
+    console.log("Dashboard data:", dashboardData);
 
     setUserAgents(agents);
     setPublicAgents(publicAgents);
@@ -107,43 +116,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const login = async (
     email: string,
-    password?: string,
+    password: string,
   ): Promise<User | null> => {
     setIsLoading(true);
 
     try {
-      let user = db.getUserByEmail(email);
-      console.log("Found user:", user);
-
-      // If user doesn't exist, create a new one (for demo purposes)
-      if (!user) {
-        const randomNames = [
-          "John Doe",
-          "Jane Smith",
-          "Alex Trader",
-          "Sarah Investor",
-          "Mike Quant",
-          "Emma Analyst",
-          "David Broker",
-          "Lisa Manager",
-          "Tom Strategist",
-          "Amy Advisor",
-        ];
-        const randomName =
-          randomNames[Math.floor(Math.random() * randomNames.length)];
-
-        user = db.createUser({
-          email,
-          name: randomName,
-          timezone: "America/New_York",
-        });
-        console.log("Created new user:", user);
-      }
+      console.log("Attempting login for email:", email);
+      const user = db.authenticateUser(email, password);
+      console.log("Login result:", user);
 
       if (user) {
         setCurrentUser(user);
         setIsLoggedIn(true);
-        console.log("Loading data for user ID:", user.id);
         loadUserData(user.id);
 
         // Save login state
@@ -151,7 +135,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           "finlake-login",
           JSON.stringify({
             isLoggedIn: true,
-            userEmail: email,
+            userId: user.id,
           }),
         );
       }
@@ -160,6 +144,42 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       return user;
     } catch (error) {
       console.error("Login error:", error);
+      setIsLoading(false);
+      return null;
+    }
+  };
+
+  const register = async (userData: {
+    email: string;
+    username: string;
+    password: string;
+    name: string;
+    timezone: string;
+  }): Promise<User | null> => {
+    setIsLoading(true);
+
+    try {
+      const user = db.registerUser(userData);
+
+      if (user) {
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+        loadUserData(user.id);
+
+        // Save login state
+        localStorage.setItem(
+          "finlake-login",
+          JSON.stringify({
+            isLoggedIn: true,
+            userId: user.id,
+          }),
+        );
+      }
+
+      setIsLoading(false);
+      return user;
+    } catch (error) {
+      console.error("Registration error:", error);
       setIsLoading(false);
       return null;
     }
@@ -195,13 +215,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const createAgent = async (
     agentData: Omit<Agent, "id" | "createdAt" | "lastActive" | "performance">,
   ): Promise<Agent | null> => {
-    if (!currentUser) return null;
+    if (!currentUser) {
+      console.error("No current user found");
+      return null;
+    }
 
     try {
+      console.log("Creating agent with data:", agentData);
+      console.log("Current user ID:", currentUser.id);
+
       const agent = db.createAgent({
         ...agentData,
         userId: currentUser.id,
       });
+
+      console.log("Created agent:", agent);
 
       setUserAgents((prev) => [...prev, agent]);
       refreshDashboardData();
@@ -300,6 +328,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
+  // Add the isUserSubscribed function
+  const isUserSubscribed = (agentId: string): boolean => {
+    if (!currentUser) return false;
+    return db.isUserSubscribed(currentUser.id, agentId);
+  };
+
   const getPortfolioHistory = (userId: string, days: number = 30) => {
     return db.getPortfolioHistory(userId, days);
   };
@@ -308,6 +342,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     currentUser,
     isLoggedIn,
     login,
+    register,
     logout,
     updateUser,
     userAgents,
@@ -316,7 +351,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     updateAgent,
     deleteAgent,
     subscribeToAgent,
-    userSignals,
+    isUserSubscribed,
+    signals: userSignals,
     createSignal,
     dashboardData,
     refreshDashboardData,

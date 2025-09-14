@@ -12,6 +12,7 @@ import {
   FiCheck,
   FiAlertCircle,
   FiInfo,
+  FiShield,
 } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/contexts/AppContext";
@@ -22,6 +23,7 @@ interface AgentData {
   description: string;
   owner: string;
   strategyPrompt: string;
+  tradingLogicPrompt: string; // Add this new field
   strategyType: "burst_rule" | "sentiment_rule" | "manual";
 
   // Step 2: Parameters
@@ -60,8 +62,9 @@ const CreateAgent = () => {
   const [agentData, setAgentData] = useState<AgentData>({
     name: "",
     description: "",
-    owner: "user@example.com", // This would come from auth
+    owner: currentUser?.email || "",
     strategyPrompt: "",
+    tradingLogicPrompt: "", // Add this new field
     strategyType: "burst_rule",
     entityScope: "publisher",
     windowMinutes: 30,
@@ -200,10 +203,32 @@ const CreateAgent = () => {
     });
   };
 
+  // Add function to get default tags based on agent type
+  const getDefaultTags = (type: string) => {
+    if (type === "burst_rule") {
+      return ["momentum", "high-frequency", "automated"];
+    } else if (type === "sentiment_rule") {
+      return ["sentiment", "news", "AI"];
+    }
+    return ["trading", "automated"];
+  };
+
   const handlePublish = async () => {
     try {
       if (!currentUser) {
         alert("Please log in to create an agent");
+        return;
+      }
+
+      // Validate required fields including the new trading logic prompt
+      if (
+        !agentData.name ||
+        !agentData.strategyPrompt ||
+        !agentData.tradingLogicPrompt
+      ) {
+        alert(
+          "Please fill in all required fields including the Trading Logic Prompt",
+        );
         return;
       }
 
@@ -214,7 +239,8 @@ const CreateAgent = () => {
         type: agentData.strategyType,
         status: agentData.status,
         visibility: agentData.visibility,
-        strategyPrompt: agentData.strategyPrompt,
+        strategyPrompt: agentData.tradingLogicPrompt, // Add this field
+        tradingLogicPrompt: agentData.tradingLogicPrompt, // Include the new field
         parameters: {
           entityScope: agentData.entityScope,
           windowMinutes: agentData.windowMinutes,
@@ -235,7 +261,10 @@ const CreateAgent = () => {
           activeHours: agentData.activeHours,
           tradingDays: agentData.tradingDays,
         },
-        tags: agentData.tags,
+        tags:
+          agentData.tags.length > 0
+            ? agentData.tags
+            : getDefaultTags(agentData.strategyType),
         performance: {
           totalSignals: 0,
           successRate: 0,
@@ -324,6 +353,32 @@ const CreateAgent = () => {
         </p>
       </div>
 
+      {/* New Trading Logic Prompt Field */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Trading Logic Prompt *
+        </label>
+        <Textarea
+          placeholder="Enter your core trading logic here. This will be used as the agent's primary decision-making algorithm. Keep this private and secure."
+          value={agentData.tradingLogicPrompt}
+          onChange={(e) =>
+            setAgentData((prev) => ({
+              ...prev,
+              tradingLogicPrompt: e.target.value,
+            }))
+          }
+          className="bg-gray-800 border-gray-600 text-white h-40"
+        />
+        <div className="flex items-start gap-2 mt-2">
+          <FiShield className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-yellow-400">
+            <strong>Private Field:</strong> This trading logic will be encrypted
+            and never shared with other users. It's your proprietary algorithm
+            that powers the agent's decision-making process.
+          </p>
+        </div>
+      </div>
+
       <div className="bg-gray-800 p-4 rounded-lg">
         <h4 className="text-sm font-medium text-white mb-2">
           Auto-detected Strategy Type
@@ -363,7 +418,6 @@ const CreateAgent = () => {
           </span>
         </div>
         <Button
-          variant="outline"
           size="sm"
           className="mt-2 text-xs"
           onClick={() =>
@@ -394,6 +448,10 @@ const CreateAgent = () => {
           <div>Min avg sentiment: {agentData.minAvgSentiment}</div>
           <div>Side: {agentData.side}</div>
           <div>Size: ${agentData.perSignalNotional} per signal</div>
+        </div>
+        <div className="mt-2 text-xs text-gray-400">
+          Confidence meter: {parseConfidence} (with inline tips if something is
+          missing)
         </div>
       </div>
     </div>
@@ -1208,7 +1266,11 @@ const CreateAgent = () => {
                   onClick={() =>
                     setCurrentStep((prev) => Math.min(5, prev + 1))
                   }
-                  disabled={!agentData.name || !agentData.strategyPrompt}
+                  disabled={
+                    !agentData.name ||
+                    !agentData.strategyPrompt ||
+                    !agentData.tradingLogicPrompt
+                  }
                   className="bg-white text-black hover:bg-gray-100"
                 >
                   Next
@@ -1217,6 +1279,11 @@ const CreateAgent = () => {
               ) : (
                 <Button
                   onClick={handlePublish}
+                  disabled={
+                    !agentData.name ||
+                    !agentData.strategyPrompt ||
+                    !agentData.tradingLogicPrompt
+                  }
                   className="bg-white text-black hover:bg-gray-100"
                 >
                   Publish Agent

@@ -27,7 +27,7 @@ export function JoinRoomDialog({ isOpen, onClose }: JoinRoomDialogProps) {
 
   // Handle Enter key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && roomId.trim()) {
+    if (e.key === "Enter" && roomId.trim()) {
       handleJoinRoom();
     }
   };

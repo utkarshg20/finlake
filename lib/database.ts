@@ -4,12 +4,16 @@
 export interface User {
   id: string;
   email: string;
+  username: string; // Add username field
+  password: string; // Add password field (hashed)
   name: string;
   phone?: string;
   bio?: string;
   timezone: string;
   createdAt: string;
   lastLogin: string;
+  authProvider: "email" | "google" | "github" | "discord"; // Add auth provider
+  isEmailVerified: boolean; // Add email verification status
 }
 
 export interface Agent {
@@ -29,42 +33,26 @@ export interface Agent {
     totalSubscribers: number;
   };
   tags: string[];
-  configuration: {
-    perSignalNotional: number;
-    maxSignalsPerHour: number;
-    cooldownPerEntity: number;
-    activeHours: string;
-    tradingDays: string[];
-    // Burst rule specific
-    entityScope?: "publisher" | "ticker";
-    windowMinutes?: number;
-    minBurst?: number;
-    minAvgSentiment?: number;
-    side?: "buy" | "sell";
-    minMessages?: number;
-    // Sentiment rule specific
-    lookbackMinutes?: number;
-    minHeadlines?: number;
-    // Advanced settings
-    credibilityWeight?: number;
-    dedupCooldown?: number;
-    maxCandidates?: number;
-  };
   strategyPrompt: string;
-  ruleJson: any;
+  tradingLogicPrompt: string; // Add this new field
+  parameters: any;
+  riskSettings: any;
+  pricing?: AgentPricing;
 }
 
 export interface Signal {
   id: string;
   agentId: string;
   userId: string;
-  symbol: string;
-  side: "buy" | "sell";
+  entity: string; // Changed from symbol to entity
+  action: "buy" | "sell"; // Changed from side to action
   price: number;
   quantity: number;
-  pnl: number;
+  notional: number; // Added notional
+  confidence: number; // Added confidence
+  return: number; // Changed from pnl to return
   timestamp: string;
-  status: "open" | "closed" | "pending";
+  status: "executed" | "pending" | "cancelled"; // Updated status values
   metadata?: any;
 }
 
@@ -84,11 +72,33 @@ export interface PortfolioHistory {
   cumulativeReturn: number;
 }
 
+// Add pricing interface
+export interface AgentPricing {
+  subscriptionFee: number; // Monthly subscription fee in USD
+  setupFee?: number; // One-time setup fee
+  currency: string; // USD, EUR, etc.
+  billingCycle: "monthly" | "yearly" | "one-time";
+  trialDays?: number; // Free trial period
+}
+
+// Add subscription interface
+export interface UserSubscription {
+  id: string;
+  userId: string;
+  agentId: string;
+  subscribedAt: string;
+  expiresAt: string;
+  status: "active" | "expired" | "cancelled";
+  amountPaid: number;
+  billingCycle: "monthly" | "yearly" | "one-time";
+  nextBillingDate?: string;
+}
+
 class Database {
   private users: User[] = [];
   private agents: Agent[] = [];
   private signals: Signal[] = [];
-  private subscriptions: Subscription[] = [];
+  private subscriptions: UserSubscription[] = [];
   private portfolioHistory: PortfolioHistory[] = [];
 
   constructor() {
@@ -127,418 +137,591 @@ class Database {
     }
   }
 
+  // Add method to hash passwords
+  private hashPassword(password: string): string {
+    // In a real app, use bcrypt or similar
+    // For demo purposes, we'll use a simple hash
+    return btoa(password + "salt"); // Base64 encode with salt
+  }
+
+  // Add method to verify passwords
+  private verifyPassword(password: string, hashedPassword: string): boolean {
+    return this.hashPassword(password) === hashedPassword;
+  }
+
+  // Add method to register new user
+  registerUser(userData: {
+    email: string;
+    username: string;
+    password: string;
+    name: string;
+    timezone: string;
+  }): User | null {
+    // Check if user already exists by email OR username
+    const existingUser = this.users.find(
+      (u) => u.email === userData.email || u.username === userData.username,
+    );
+
+    if (existingUser) {
+      console.log("User already exists with email or username");
+      return null;
+    }
+
+    const user: User = {
+      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      email: userData.email,
+      username: userData.username,
+      password: this.hashPassword(userData.password),
+      name: userData.name,
+      timezone: userData.timezone,
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      authProvider: "email",
+      isEmailVerified: false,
+    };
+
+    this.users.push(user);
+    this.saveToStorage();
+    return user;
+  }
+
+  // Add method to authenticate user
+  authenticateUser(email: string, password: string): User | null {
+    console.log("Attempting to authenticate:", email);
+    console.log(
+      "Current users in DB:",
+      this.users.map((u) => ({ email: u.email, username: u.username })),
+    );
+
+    const user = this.users.find((u) => u.email === email);
+    console.log("Found user:", user);
+
+    if (
+      user &&
+      user.authProvider === "email" &&
+      this.verifyPassword(password, user.password)
+    ) {
+      // Update last login
+      user.lastLogin = new Date().toISOString();
+      this.saveToStorage();
+      console.log("Authentication successful for:", user.email);
+      return user;
+    }
+
+    console.log("Authentication failed");
+    return null;
+  }
+
+  // Add method to find user by username
+  getUserByUsername(username: string): User | null {
+    return this.users.find((user) => user.username === username) || null;
+  }
+
+  // Update sample data to include Aryan's account
   private initializeSampleData() {
     // Only initialize if no data exists
     if (this.users.length === 0) {
-      // Create sample users
+      // Create Aryan's account first
+      const aryanUser: User = {
+        id: "user_aryan_001",
+        email: "aryan@gmail.com",
+        username: "aryanp",
+        password: this.hashPassword("aryan"),
+        name: "Aryan",
+        phone: "+1 (555) 123-4567",
+        bio: "Professional algorithmic trader with 3+ years experience",
+        timezone: "America/New_York",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        lastLogin: new Date().toISOString(),
+        authProvider: "email" as const,
+        isEmailVerified: true,
+      };
+
+      // Create other sample users
       const sampleUsers = [
-        {
-          id: "user_sample_001",
-          email: "john.doe@example.com",
-          name: "John Doe",
-          phone: "+1 (555) 123-4567",
-          bio: "Professional algorithmic trader with 5+ years experience",
-          timezone: "America/New_York",
-          createdAt: "2024-01-01T00:00:00.000Z",
-          lastLogin: new Date().toISOString(),
-        },
+        aryanUser,
         {
           id: "user_sample_002",
           email: "jane.smith@example.com",
+          username: "janesmith",
+          password: this.hashPassword("password123"),
           name: "Jane Smith",
           phone: "+1 (555) 987-6543",
           bio: "Quantitative analyst specializing in crypto markets",
           timezone: "America/Los_Angeles",
           createdAt: "2024-01-02T00:00:00.000Z",
           lastLogin: new Date().toISOString(),
+          authProvider: "email" as const,
+          isEmailVerified: true,
         },
         {
           id: "user_sample_003",
           email: "alex.trader@example.com",
+          username: "alextrader",
+          password: this.hashPassword("password123"),
           name: "Alex Trader",
           phone: "+1 (555) 456-7890",
           bio: "Day trader focused on momentum strategies",
           timezone: "America/Chicago",
           createdAt: "2024-01-03T00:00:00.000Z",
           lastLogin: new Date().toISOString(),
+          authProvider: "email" as const,
+          isEmailVerified: true,
         },
         {
           id: "user_sample_004",
           email: "sarah.investor@example.com",
+          username: "sarahinvestor",
+          password: this.hashPassword("password123"),
           name: "Sarah Investor",
           phone: "+1 (555) 321-0987",
           bio: "Institutional investor with focus on ESG trading",
           timezone: "America/New_York",
           createdAt: "2024-01-04T00:00:00.000Z",
           lastLogin: new Date().toISOString(),
+          authProvider: "email" as const,
+          isEmailVerified: true,
         },
         {
           id: "user_sample_005",
           email: "mike.quant@example.com",
+          username: "mikequant",
+          password: this.hashPassword("password123"),
           name: "Mike Quant",
           phone: "+1 (555) 654-3210",
           bio: "Quantitative researcher and hedge fund manager",
           timezone: "America/New_York",
           createdAt: "2024-01-05T00:00:00.000Z",
           lastLogin: new Date().toISOString(),
+          authProvider: "email" as const,
+          isEmailVerified: true,
         },
       ];
 
       this.users = sampleUsers;
 
-      // Create comprehensive sample agents
-      const sampleAgents = [
-        // Private agent owned by user_sample_001 (John Doe) - Current User
+      // Create Aryan's private agents (2-3 months old)
+      const aryanAgents: Agent[] = [
         {
-          id: "agent_user_private_001",
-          userId: "user_sample_001",
-          name: "Personal Momentum Scanner",
+          id: "agent_aryan_001",
+          userId: "user_aryan_001",
+          name: "Momentum Tracker Pro",
           description:
-            "Private momentum scanner for personal trading strategies",
-          type: "burst_rule" as const,
-          status: "active" as const,
-          visibility: "private" as const,
-          createdAt: "2024-01-15T00:00:00.000Z",
+            "Advanced momentum-based trading strategy for equity markets",
+          type: "burst_rule",
+          status: "active",
+          visibility: "private",
+          createdAt: new Date(
+            Date.now() - 90 * 24 * 60 * 60 * 1000,
+          ).toISOString(), // 3 months ago
           lastActive: new Date().toISOString(),
-          performance: {
-            totalSignals: 89,
-            successRate: 82.1,
-            avgReturn: 18.7,
-            totalSubscribers: 0,
-          },
-          tags: ["momentum", "personal", "private", "equities"],
-          strategyPrompt:
-            "Buy when personal watchlist stocks show momentum with volume confirmation",
+          tradingLogicPrompt:
+            "Monitor equity market momentum using RSI and MACD indicators. Execute trades when momentum shifts align with volume spikes and market sentiment.",
           parameters: {
-            entityScope: "ticker" as const,
-            windowMinutes: 20,
-            minBurst: 2.5,
-            minAvgSentiment: 0.4,
-            side: "buy" as const,
-            minMessages: 5,
-            lookbackMinutes: 40,
-            minHeadlines: 3,
-            credibilityWeight: 0.8,
-            dedupCooldown: 30,
-            maxCandidates: 15,
-          },
-          riskSettings: {
-            perSignalNotional: 2500,
-            maxSignalsPerHour: 2,
-            cooldownPerEntity: 60,
-            activeHours: "09:30-16:00",
-            tradingDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-            ],
-          },
-        },
-
-        // Public agent owned by user_sample_001 (John Doe) - Current User
-        {
-          id: "agent_user_public_001",
-          userId: "user_sample_001",
-          name: "News Burst Pro",
-          description:
-            "Advanced news burst detection with sentiment analysis and risk management",
-          type: "burst_rule" as const,
-          status: "active" as const,
-          visibility: "public" as const,
-          createdAt: "2024-01-10T00:00:00.000Z",
-          lastActive: new Date().toISOString(),
-          performance: {
-            totalSignals: 156,
-            successRate: 85.3,
-            avgReturn: 22.4,
-            totalSubscribers: 34,
-          },
-          tags: ["news", "burst", "sentiment", "advanced", "pro"],
-          strategyPrompt:
-            "Buy when reputable publishers spike with positive sentiment for the last 30-60 minutes with risk-adjusted position sizing",
-          parameters: {
-            entityScope: "publisher" as const,
-            windowMinutes: 30,
-            minBurst: 3.0,
-            minAvgSentiment: 0.2,
-            side: "buy" as const,
-            minMessages: 3,
-            lookbackMinutes: 60,
-            minHeadlines: 3,
-            credibilityWeight: 0.7,
-            dedupCooldown: 30,
-            maxCandidates: 20,
+            entityScope: "equities",
+            windowMinutes: 15,
+            minBurstThreshold: 0.8,
+            maxBurstThreshold: 1.2,
+            cooldownMinutes: 30,
           },
           riskSettings: {
             perSignalNotional: 1000,
-            maxSignalsPerHour: 3,
+            maxSignalsPerHour: 4,
             cooldownPerEntity: 60,
-            activeHours: "09:30-16:00",
+            activeTradingHours: { start: "09:00", end: "16:00" },
             tradingDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
             ],
+            statusOnCreate: "active",
           },
-        },
-
-        // Public agents owned by other users (existing ones)
-        {
-          id: "agent_sample_003",
-          userId: "user_sample_002",
-          name: "Crypto Sentiment Scanner",
-          description:
-            "Advanced sentiment analysis for cryptocurrency markets with social media integration",
-          type: "sentiment_rule" as const,
-          status: "active" as const,
-          visibility: "public" as const,
-          createdAt: "2024-01-10T00:00:00.000Z",
-          lastActive: new Date().toISOString(),
           performance: {
             totalSignals: 156,
-            successRate: 82.1,
-            avgReturn: 15.6,
-            totalSubscribers: 23,
+            successRate: 78.2,
+            avgReturn: 2.4,
+            totalReturn: 374.4,
+            totalSubscribers: 0,
+            winRate: 0.782,
+            avgWin: 3.2,
+            avgLoss: -1.8,
+            maxDrawdown: -8.5,
+            sharpeRatio: 1.85,
           },
-          tags: ["crypto", "sentiment", "social-media", "bitcoin"],
-          strategyPrompt:
-            "Buy when crypto sentiment from social media and news sources turns positive with high confidence",
+          tags: ["equities", "momentum", "RSI", "MACD", "high-frequency"],
+          pricing: null,
+        },
+        {
+          id: "agent_aryan_002",
+          userId: "user_aryan_001",
+          name: "Sentiment Analyzer",
+          description:
+            "AI-powered sentiment analysis for news and social media trading signals",
+          type: "sentiment_rule",
+          status: "active",
+          visibility: "private",
+          createdAt: new Date(
+            Date.now() - 60 * 24 * 60 * 60 * 1000,
+          ).toISOString(), // 2 months ago
+          lastActive: new Date().toISOString(),
+          tradingLogicPrompt:
+            "Analyze news sentiment and social media buzz for major stocks. Execute trades based on sentiment shifts and volume confirmation.",
           parameters: {
-            entityScope: "ticker" as const,
-            windowMinutes: 45,
-            minBurst: 2.5,
+            entityScope: "stocks",
+            windowMinutes: 30,
             minAvgSentiment: 0.6,
-            side: "buy" as const,
-            minMessages: 10,
-            lookbackMinutes: 90,
-            minHeadlines: 8,
-            credibilityWeight: 0.9,
-            dedupCooldown: 45,
-            maxCandidates: 25,
+            maxAvgSentiment: 0.9,
+            cooldownMinutes: 45,
+          },
+          riskSettings: {
+            perSignalNotional: 2000,
+            maxSignalsPerHour: 2,
+            cooldownPerEntity: 90,
+            activeTradingHours: { start: "08:00", end: "18:00" },
+            tradingDays: [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+            ],
+            statusOnCreate: "active",
+          },
+          performance: {
+            totalSignals: 89,
+            successRate: 71.9,
+            avgReturn: 1.8,
+            totalReturn: 160.2,
+            totalSubscribers: 0,
+            winRate: 0.719,
+            avgWin: 2.5,
+            avgLoss: -1.2,
+            maxDrawdown: -6.2,
+            sharpeRatio: 1.42,
+          },
+          tags: ["sentiment", "news", "social-media", "AI", "stocks"],
+          pricing: null,
+        },
+      ];
+
+      // Create other sample agents
+      const sampleAgents: Agent[] = [
+        ...aryanAgents,
+        {
+          id: "agent_sample_001",
+          userId: "user_sample_002",
+          name: "Equity Arbitrage Bot",
+          description:
+            "Automated arbitrage trading across multiple equity exchanges",
+          type: "burst_rule",
+          status: "active",
+          visibility: "public",
+          createdAt: "2024-01-15T00:00:00.000Z",
+          lastActive: new Date().toISOString(),
+          tradingLogicPrompt:
+            "Monitor price differences across exchanges and execute arbitrage trades when spreads exceed threshold.",
+          parameters: {
+            entityScope: "equities",
+            windowMinutes: 5,
+            minBurstThreshold: 0.5,
+            maxBurstThreshold: 2.0,
+            cooldownMinutes: 15,
           },
           riskSettings: {
             perSignalNotional: 500,
-            maxSignalsPerHour: 5,
+            maxSignalsPerHour: 8,
             cooldownPerEntity: 30,
-            activeHours: "00:00-23:59",
+            activeTradingHours: { start: "00:00", end: "23:59" },
             tradingDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday",
             ],
+            statusOnCreate: "active",
+          },
+          performance: {
+            totalSignals: 234,
+            successRate: 85.5,
+            avgReturn: 0.8,
+            totalReturn: 187.2,
+            totalSubscribers: 12,
+            winRate: 0.855,
+            avgWin: 1.2,
+            avgLoss: -0.4,
+            maxDrawdown: -3.1,
+            sharpeRatio: 2.1,
+          },
+          tags: ["arbitrage", "equities", "high-frequency", "automated"],
+          pricing: {
+            type: "monthly",
+            amount: 5.0,
+            currency: "USD",
+            trialDays: 7,
           },
         },
         {
-          id: "agent_sample_004",
-          userId: "user_sample_002",
-          name: "DeFi Yield Hunter",
+          id: "agent_sample_002",
+          userId: "user_sample_003",
+          name: "Momentum Master",
           description:
-            "Identifies high-yield DeFi opportunities with risk assessment",
-          type: "burst_rule" as const,
-          status: "active" as const,
-          visibility: "public" as const,
-          createdAt: "2024-01-12T00:00:00.000Z",
+            "Advanced momentum trading strategy for volatile markets",
+          type: "burst_rule",
+          status: "active",
+          visibility: "public",
+          createdAt: "2024-02-01T00:00:00.000Z",
           lastActive: new Date().toISOString(),
-          performance: {
-            totalSignals: 89,
-            successRate: 74.2,
-            avgReturn: 22.3,
-            totalSubscribers: 45,
-          },
-          tags: ["defi", "yield", "liquidity", "staking"],
-          strategyPrompt:
-            "Buy when new DeFi protocols launch with high APY and low risk scores",
+          tradingLogicPrompt:
+            "Identify momentum shifts in volatile markets using technical indicators and volume analysis.",
           parameters: {
-            entityScope: "ticker" as const,
+            entityScope: "stocks",
             windowMinutes: 20,
-            minBurst: 4.0,
-            minAvgSentiment: 0.8,
-            side: "buy" as const,
-            minMessages: 5,
-            lookbackMinutes: 40,
-            minHeadlines: 3,
-            credibilityWeight: 0.95,
-            dedupCooldown: 15,
-            maxCandidates: 10,
+            minBurstThreshold: 0.7,
+            maxBurstThreshold: 1.5,
+            cooldownMinutes: 40,
           },
           riskSettings: {
-            perSignalNotional: 300,
-            maxSignalsPerHour: 8,
-            cooldownPerEntity: 20,
-            activeHours: "00:00-23:59",
+            perSignalNotional: 1500,
+            maxSignalsPerHour: 3,
+            cooldownPerEntity: 60,
+            activeTradingHours: { start: "09:30", end: "16:00" },
             tradingDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
             ],
+            statusOnCreate: "active",
+          },
+          performance: {
+            totalSignals: 178,
+            successRate: 72.5,
+            avgReturn: 2.1,
+            totalReturn: 373.8,
+            totalSubscribers: 8,
+            winRate: 0.725,
+            avgWin: 3.1,
+            avgLoss: -1.5,
+            maxDrawdown: -7.8,
+            sharpeRatio: 1.65,
+          },
+          tags: ["momentum", "volatility", "technical-analysis", "stocks"],
+          pricing: {
+            type: "monthly",
+            amount: 10.0,
+            currency: "USD",
+            trialDays: 14,
           },
         },
       ];
 
       this.agents = sampleAgents;
 
-      // Create historical portfolio data for user_sample_001 (John Doe)
-      const portfolioHistory = this.generatePortfolioHistory(
-        "user_sample_001",
-        100000,
-        30,
-      );
-      this.portfolioHistory = portfolioHistory;
-
-      // Create sample signals for user's agents
-      const sampleSignals = [
-        // Signals for user's private agent
+      // Create sample signals for Aryan's agents
+      const aryanSignals: Signal[] = [
+        // Signals for Momentum Tracker Pro (last 3 months)
         {
-          id: "signal_user_001",
-          agentId: "agent_user_private_001",
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          symbol: "AAPL",
-          side: "buy" as const,
-          notional: 2500,
-          price: 175.5,
-          rationale: "Momentum breakout with volume confirmation",
-          confidence: 0.88,
-          status: "executed" as const,
-        },
-        {
-          id: "signal_user_002",
-          agentId: "agent_user_private_001",
-          timestamp: new Date(Date.now() - 7200000).toISOString(),
-          symbol: "TSLA",
-          side: "buy" as const,
-          notional: 2500,
-          price: 245.8,
-          rationale: "Strong momentum with technical confirmation",
-          confidence: 0.92,
-          status: "executed" as const,
-        },
-        {
-          id: "signal_user_003",
-          agentId: "agent_user_private_001",
-          timestamp: new Date(Date.now() - 10800000).toISOString(),
-          symbol: "NVDA",
-          side: "sell" as const,
-          notional: 2500,
-          price: 485.2,
-          rationale: "Momentum reversal detected",
-          confidence: 0.75,
-          status: "executed" as const,
-        },
-        // Signals for user's public agent
-        {
-          id: "signal_user_004",
-          agentId: "agent_user_public_001",
-          timestamp: new Date(Date.now() - 1800000).toISOString(),
-          symbol: "MSFT",
-          side: "buy" as const,
-          notional: 1000,
-          price: 378.9,
-          rationale: "News burst with positive sentiment",
+          id: "signal_aryan_001",
+          agentId: "agent_aryan_001",
+          userId: "user_aryan_001",
+          entity: "AAPL",
+          action: "buy",
           confidence: 0.85,
-          status: "executed" as const,
+          price: 185.25,
+          quantity: 5.4,
+          notional: 1000,
+          status: "executed",
+          return: 2.3,
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+          metadata: {
+            rsi: 35.2,
+            macd: 0.8,
+            volume: 1250000,
+            momentum: 0.92,
+          },
         },
         {
-          id: "signal_user_005",
-          agentId: "agent_user_public_001",
-          timestamp: new Date(Date.now() - 5400000).toISOString(),
-          symbol: "GOOGL",
-          side: "buy" as const,
+          id: "signal_aryan_002",
+          agentId: "agent_aryan_001",
+          userId: "user_aryan_001",
+          entity: "MSFT",
+          action: "sell",
+          confidence: 0.78,
+          price: 365.8,
+          quantity: 2.73,
           notional: 1000,
-          price: 142.3,
-          rationale: "Earnings news burst with bullish sentiment",
-          confidence: 0.91,
-          status: "executed" as const,
+          status: "executed",
+          return: -1.2,
+          timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
+          metadata: {
+            rsi: 68.5,
+            macd: -0.3,
+            volume: 890000,
+            momentum: 0.65,
+          },
+        },
+        {
+          id: "signal_aryan_003",
+          agentId: "agent_aryan_001",
+          userId: "user_aryan_001",
+          entity: "GOOGL",
+          action: "buy",
+          confidence: 0.82,
+          price: 142.5,
+          quantity: 7.02,
+          notional: 1000,
+          status: "executed",
+          return: 3.1,
+          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+          metadata: {
+            rsi: 28.9,
+            macd: 1.2,
+            volume: 2100000,
+            momentum: 0.88,
+          },
+        },
+        // Signals for Sentiment Analyzer (last 2 months)
+        {
+          id: "signal_aryan_004",
+          agentId: "agent_aryan_002",
+          userId: "user_aryan_001",
+          entity: "AAPL",
+          action: "buy",
+          confidence: 0.76,
+          price: 185.25,
+          quantity: 5.4,
+          notional: 2000,
+          status: "executed",
+          return: 1.8,
+          timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
+          metadata: {
+            sentiment: 0.72,
+            newsCount: 15,
+            socialBuzz: 0.68,
+            volume: 45000000,
+          },
+        },
+        {
+          id: "signal_aryan_005",
+          agentId: "agent_aryan_002",
+          userId: "user_aryan_001",
+          entity: "TSLA",
+          action: "sell",
+          confidence: 0.71,
+          price: 245.8,
+          quantity: 8.14,
+          notional: 2000,
+          status: "executed",
+          return: -0.9,
+          timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
+          metadata: {
+            sentiment: 0.45,
+            newsCount: 8,
+            socialBuzz: 0.52,
+            volume: 32000000,
+          },
         },
       ];
 
-      this.signals = sampleSignals;
+      this.signals = aryanSignals;
 
-      // Save to localStorage
+      // Create portfolio history for Aryan (last 3 months)
+      const aryanPortfolioHistory = this.generatePortfolioHistory(
+        "user_aryan_001",
+        90,
+      );
+      this.portfolioHistory = aryanPortfolioHistory;
+
+      // Create sample subscriptions
+      const sampleSubscriptions: Subscription[] = [
+        {
+          id: "sub_001",
+          userId: "user_sample_002",
+          agentId: "agent_sample_001",
+          status: "active",
+          startDate: "2024-02-01T00:00:00.000Z",
+          endDate: "2024-03-01T00:00:00.000Z",
+          price: 99.99,
+          currency: "USD",
+        },
+        {
+          id: "sub_002",
+          userId: "user_sample_003",
+          agentId: "agent_sample_002",
+          status: "active",
+          startDate: "2024-02-15T00:00:00.000Z",
+          endDate: "2024-03-15T00:00:00.000Z",
+          price: 149.99,
+          currency: "USD",
+        },
+      ];
+
+      this.subscriptions = sampleSubscriptions;
+
       this.saveToStorage();
     }
   }
 
+  // Update ensureSampleData to always reinitialize for now
   private ensureSampleData() {
-    // Check if we have the sample users, if not, initialize sample data
-    const hasSampleUsers = this.users.some(
-      (user) => user.id === "user_sample_001",
-    );
-    if (!hasSampleUsers) {
-      console.log("Initializing sample data...");
-      this.initializeSampleData();
-    } else {
-      console.log("Sample data already exists");
-    }
+    console.log("Ensuring sample data exists...");
+    console.log("Current users count:", this.users.length);
+
+    // For now, always reinitialize to ensure clean data
+    this.clearAllDataAndReinitialize();
   }
 
-  // Generate realistic portfolio history
+  // Add method to clear all data and reinitialize
+  clearAllDataAndReinitialize() {
+    console.log("Clearing all data and reinitializing...");
+    this.users = [];
+    this.agents = [];
+    this.signals = [];
+    this.subscriptions = [];
+    this.portfolioHistory = [];
+    localStorage.clear();
+    this.initializeSampleData();
+    console.log("Data cleared and reinitialized");
+  }
+
+  // Generate portfolio history for Aryan with realistic data
   private generatePortfolioHistory(
     userId: string,
-    initialValue: number,
     days: number,
-  ) {
-    const history = [];
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+  ): PortfolioHistory[] {
+    const history: PortfolioHistory[] = [];
+    const startValue = 10000; // Starting with $10,000
+    let currentValue = startValue;
 
-    let currentValue = initialValue;
-    const dailyReturns = this.generateDailyReturns(days);
+    for (let i = days; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
 
-    for (let i = 0; i < days; i++) {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
+      // Generate realistic daily returns with some volatility
+      const baseReturn = 0.001; // 0.1% base daily return
+      const volatility = 0.02; // 2% daily volatility
+      const randomFactor = (Math.random() - 0.5) * 2; // -1 to 1
+      const dailyReturn = baseReturn + volatility * randomFactor;
 
-      // Apply daily return with some volatility
-      const dailyReturn = dailyReturns[i];
       currentValue = currentValue * (1 + dailyReturn);
 
       history.push({
         userId,
         date: date.toISOString().split("T")[0],
-        value: Math.round(currentValue),
+        value: Math.round(currentValue * 100) / 100,
         dailyReturn: Math.round(dailyReturn * 10000) / 100, // Convert to percentage
         cumulativeReturn:
-          Math.round(((currentValue - initialValue) / initialValue) * 10000) /
-          100,
+          Math.round(((currentValue - startValue) / startValue) * 10000) / 100,
       });
     }
 
     return history;
-  }
-
-  // Generate realistic daily returns with some correlation
-  private generateDailyReturns(days: number) {
-    const returns = [];
-    let trend = 0.0005; // Slight upward trend
-
-    for (let i = 0; i < days; i++) {
-      // Add some trend and mean reversion
-      const randomFactor = (Math.random() - 0.5) * 0.04; // ±2% daily volatility
-      const trendFactor = trend * (1 + Math.sin(i / 7) * 0.3); // Weekly cycles
-      const returnValue = trendFactor + randomFactor;
-
-      returns.push(returnValue);
-
-      // Adjust trend slightly based on recent performance
-      if (i > 5) {
-        const recentAvg = returns.slice(-5).reduce((a, b) => a + b, 0) / 5;
-        trend = trend * 0.95 + recentAvg * 0.05;
-      }
-    }
-
-    return returns;
   }
 
   // Add method to get portfolio history
@@ -693,6 +876,37 @@ class Database {
     );
   }
 
+  // Add method to get user subscriptions
+  getUserSubscriptions(userId: string): UserSubscription[] {
+    return this.subscriptions.filter((sub) => sub.userId === userId);
+  }
+
+  // Add method to create subscription
+  createSubscription(
+    subscriptionData: Omit<UserSubscription, "id" | "subscribedAt">,
+  ): UserSubscription | null {
+    const subscription: UserSubscription = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      subscribedAt: new Date().toISOString(),
+      ...subscriptionData,
+    };
+
+    this.subscriptions.push(subscription);
+    this.saveToStorage();
+    return subscription;
+  }
+
+  // Add method to check if user is subscribed to agent
+  isUserSubscribed(userId: string, agentId: string): boolean {
+    const subscription = this.subscriptions.find(
+      (sub) =>
+        sub.userId === userId &&
+        sub.agentId === agentId &&
+        sub.status === "active",
+    );
+    return !!subscription;
+  }
+
   // Helper methods
   private updateAgentPerformance(agentId: string) {
     const agent = this.getAgentById(agentId);
@@ -700,12 +914,12 @@ class Database {
 
     const agentSignals = this.getSignalsByAgentId(agentId);
     const totalSignals = agentSignals.length;
-    const successfulSignals = agentSignals.filter((s) => s.pnl > 0).length;
+    const successfulSignals = agentSignals.filter((s) => s.return > 0).length;
     const successRate =
       totalSignals > 0 ? (successfulSignals / totalSignals) * 100 : 0;
     const avgReturn =
       totalSignals > 0
-        ? agentSignals.reduce((sum, s) => sum + s.pnl, 0) / totalSignals
+        ? agentSignals.reduce((sum, s) => sum + s.return, 0) / totalSignals
         : 0;
 
     agent.performance = {
@@ -730,8 +944,8 @@ class Database {
       return signalDate.toDateString() === today.toDateString();
     });
 
-    const todayPnL = todaySignals.reduce((sum, s) => sum + s.pnl, 0);
-    const totalPnL = userSignals.reduce((sum, s) => sum + s.pnl, 0);
+    const todayPnL = todaySignals.reduce((sum, s) => sum + s.return, 0);
+    const totalPnL = userSignals.reduce((sum, s) => sum + s.return, 0);
 
     return {
       portfolio: {
@@ -749,7 +963,7 @@ class Database {
         successRate:
           userSignals.length > 0
             ? Math.round(
-                (userSignals.filter((s) => s.pnl > 0).length /
+                (userSignals.filter((s) => s.return > 0).length /
                   userSignals.length) *
                   100 *
                   10,
@@ -775,3 +989,8 @@ class Database {
 
 // Export singleton instance
 export const db = new Database();
+
+// Expose to window for debugging
+if (typeof window !== "undefined") {
+  (window as any).db = db;
+}

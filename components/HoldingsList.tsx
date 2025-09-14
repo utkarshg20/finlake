@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { motion } from "framer-motion"
+import { motion } from "framer-motion";
 
 interface Holding {
-  symbol: string
-  amount: number
-  value: number
-  change24h: number
+  symbol: string;
+  amount: number;
+  value: number;
+  change24h: number;
 }
 
 interface HoldingsListProps {
-  holdings: Holding[]
+  holdings: Holding[];
 }
 
 export function HoldingsList({ holdings }: HoldingsListProps) {
@@ -26,11 +26,17 @@ export function HoldingsList({ holdings }: HoldingsListProps) {
         >
           <div>
             <p className="text-sm font-medium text-white">{holding.symbol}</p>
-            <p className="text-xs text-gray-400">{holding.amount.toLocaleString()}</p>
+            <p className="text-xs text-gray-400">
+              {holding.amount.toLocaleString()}
+            </p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-medium text-white">${holding.value.toLocaleString()}</p>
-            <p className={`text-xs ${holding.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
+            <p className="text-sm font-medium text-white">
+              ${holding.value.toLocaleString()}
+            </p>
+            <p
+              className={`text-xs ${holding.change24h >= 0 ? "text-green-400" : "text-red-400"}`}
+            >
               {holding.change24h >= 0 ? "+" : ""}
               {holding.change24h.toFixed(2)}%
             </p>
@@ -38,6 +44,5 @@ export function HoldingsList({ holdings }: HoldingsListProps) {
         </motion.div>
       ))}
     </div>
-  )
+  );
 }
-

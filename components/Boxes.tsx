@@ -9,14 +9,14 @@ export const BoxesCore = ({ className, ...rest }: { className?: string }) => {
 
   const colors = useMemo(
     () => [
-      "--gray-300",
-      "--gray-400", 
-      "--gray-500",
-      "--gray-600",
-      "--white",
-      "--gray-200",
-      "--gray-700",
-      "--gray-800",
+      "rgb(209, 213, 219)", // gray-300
+      "rgb(156, 163, 175)", // gray-400
+      "rgb(107, 114, 128)", // gray-500
+      "rgb(75, 85, 99)", // gray-600
+      "rgb(255, 255, 255)", // white
+      "rgb(229, 231, 235)", // gray-200
+      "rgb(55, 65, 81)", // gray-700
+      "rgb(31, 41, 55)", // gray-800
     ],
     [],
   );
@@ -35,12 +35,13 @@ export const BoxesCore = ({ className, ...rest }: { className?: string }) => {
         {cols.map((_, j) => (
           <motion.div
             key={`col${j}`}
-            className="w-16 h-8 border-r border-t border-slate-700 relative"
+            className="w-16 h-8 border-r border-t border-slate-700 relative hover:opacity-80"
             initial={false}
             whileHover={{
-              backgroundColor: `var(${getRandomColor()})`,
-              transition: { duration: 0 },
+              backgroundColor: getRandomColor(),
+              transition: { duration: 0.1 },
             }}
+            style={{ pointerEvents: "auto" }}
           >
             {j % 2 === 0 && i % 2 === 0 && (
               <svg
@@ -70,7 +71,7 @@ export const BoxesCore = ({ className, ...rest }: { className?: string }) => {
         transform: `translate(-40%,-60%) skewX(-48deg) skewY(14deg) scale(0.675) rotate(0deg) translateZ(0)`,
       }}
       className={cn(
-        "fixed left-1/2 top-1/2 flex w-[250%] h-[250%] z-0",
+        "fixed left-1/2 top-1/2 flex w-[250%] h-[250%] z-0 pointer-events-auto",
         className,
       )}
       {...rest}

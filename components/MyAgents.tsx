@@ -20,10 +20,13 @@ import {
 } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/contexts/AppContext";
+import { Agent } from "@/types/agent";
 
 const MyAgents = () => {
   const { userAgents, updateAgent, deleteAgent, isLoading } = useApp();
   const router = useRouter();
+  const [selectedAgent, setSelectedAgent] = useState<any | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const toggleAgentStatus = async (agentId: string) => {
     const agent = userAgents.find((a) => a.id === agentId);
@@ -48,9 +51,205 @@ const MyAgents = () => {
     console.log("Edit agent:", agentId);
   };
 
-  const viewAgentDetails = (agentId: string) => {
-    // This would navigate to agent details page
-    console.log("View agent details:", agentId);
+  const handleViewDetails = (agent: Agent) => {
+    // Navigate to dashboard using Next.js router
+    router.push("/dashboard");
+  };
+
+  const renderAgentDetails = () => {
+    if (!selectedAgent) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white">
+                  {selectedAgent.name}
+                </h2>
+                <p className="text-gray-400 mt-1">
+                  {selectedAgent.description}
+                </p>
+                <div className="flex items-center space-x-4 mt-2">
+                  <span
+                    className={`px-2 py-1 rounded text-xs ${
+                      selectedAgent.status === "active"
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-600 text-gray-300"
+                    }`}
+                  >
+                    {selectedAgent.status}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs ${
+                      selectedAgent.visibility === "public"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-600 text-gray-300"
+                    }`}
+                  >
+                    {selectedAgent.visibility}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Created:{" "}
+                    {new Date(selectedAgent.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Performance Metrics */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Performance Metrics
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Signals</p>
+                    <p className="text-xl font-bold text-white">
+                      {selectedAgent.performance?.totalSignals || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Success Rate</p>
+                    <p className="text-xl font-bold text-green-400">
+                      {selectedAgent.performance?.successRate || 0}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Avg Return</p>
+                    <p className="text-xl font-bold text-white">
+                      ${selectedAgent.performance?.avgReturn || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Total Subscribers</p>
+                    <p className="text-xl font-bold text-white">
+                      {selectedAgent.performance?.totalSubscribers || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configuration */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Configuration
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-gray-400 text-sm">Type</p>
+                    <p className="text-white">
+                      {selectedAgent.type === "burst_rule"
+                        ? "Burst Rule"
+                        : "Sentiment Rule"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Per Signal Notional</p>
+                    <p className="text-white">
+                      ${selectedAgent.riskSettings?.perSignalNotional || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Max Signals/Hour</p>
+                    <p className="text-white">
+                      {selectedAgent.riskSettings?.maxSignalsPerHour || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Trading Hours</p>
+                    <p className="text-white">
+                      {selectedAgent.riskSettings?.activeTradingHours?.start ||
+                        "N/A"}{" "}
+                      -{" "}
+                      {selectedAgent.riskSettings?.activeTradingHours?.end ||
+                        "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trading Logic Prompt */}
+              <div className="bg-gray-800 rounded-lg p-4 lg:col-span-2">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Trading Logic Prompt
+                </h3>
+                <div className="bg-gray-900 rounded p-3">
+                  <p className="text-gray-300 text-sm whitespace-pre-wrap">
+                    {selectedAgent.tradingLogicPrompt}
+                  </p>
+                </div>
+              </div>
+
+              {/* Parameters */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Parameters
+                </h3>
+                <div className="space-y-2">
+                  {Object.entries(selectedAgent.parameters || {}).map(
+                    ([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-gray-400 text-sm capitalize">
+                          {key.replace(/([A-Z])/g, " $1").trim()}
+                        </span>
+                        <span className="text-white text-sm">
+                          {String(value)}
+                        </span>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-white mb-4">Tags</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAgent.tags?.map((tag: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded"
+                    >
+                      {tag}
+                    </span>
+                  )) || <span className="text-gray-400 text-sm">No tags</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-700">
+              <Button
+                onClick={() => setShowDetailsModal(false)}
+                className="bg-gray-700 hover:bg-gray-600 text-white"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  // Add edit functionality here
+                  console.log("Edit agent:", selectedAgent.id);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Edit Agent
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderAgentCard = (agent: any) => (
@@ -70,6 +269,9 @@ const MyAgents = () => {
             </h3>
             <p className="text-sm text-gray-400 truncate mt-1">
               {agent.description}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Created: {new Date(agent.createdAt).toLocaleDateString()}
             </p>
           </div>
           <div className="flex items-center space-x-2 flex-shrink-0">
@@ -169,43 +371,31 @@ const MyAgents = () => {
         {/* Actions */}
         <div className="flex space-x-2 pt-4 border-t border-gray-700">
           <Button
+            onClick={() => handleViewDetails(agent)}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <FiEye className="w-4 h-4 mr-2" />
+            View Details
+          </Button>
+
+          <Button
             onClick={() => toggleAgentStatus(agent.id)}
-            className={`flex-1 ${
+            className={`px-3 ${
               agent.status === "active"
-                ? "bg-orange-600 hover:bg-orange-700 text-white"
-                : "bg-green-600 hover:bg-green-700 text-white"
-            }`}
+                ? "bg-yellow-600 hover:bg-yellow-700"
+                : "bg-green-600 hover:bg-green-700"
+            } text-white`}
           >
             {agent.status === "active" ? (
-              <>
-                <FiPause className="w-4 h-4 mr-2" />
-                Pause
-              </>
+              <FiPause className="w-4 h-4" />
             ) : (
-              <>
-                <FiPlay className="w-4 h-4 mr-2" />
-                Activate
-              </>
+              <FiPlay className="w-4 h-4" />
             )}
           </Button>
 
           <Button
-            onClick={() => viewAgentDetails(agent.id)}
-            className="bg-gray-700 hover:bg-gray-600 text-white"
-          >
-            <FiEye className="w-4 h-4" />
-          </Button>
-
-          <Button
-            onClick={() => editAgent(agent.id)}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <FiEdit className="w-4 h-4" />
-          </Button>
-
-          <Button
             onClick={() => handleDeleteAgent(agent.id)}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="px-3 bg-red-600 hover:bg-red-700 text-white"
           >
             <FiTrash2 className="w-4 h-4" />
           </Button>
@@ -341,6 +531,9 @@ const MyAgents = () => {
           </div>
         )}
       </div>
+
+      {/* Agent Details Modal */}
+      {showDetailsModal && renderAgentDetails()}
     </div>
   );
 };

@@ -1,18 +1,18 @@
-"use client"
+"use client";
 
-import { motion } from "framer-motion"
-import { ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { motion } from "framer-motion";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface Holding {
-  name: string
-  symbol: string
-  amount: number
-  value: number
-  change24h: number
+  name: string;
+  symbol: string;
+  amount: number;
+  value: number;
+  change24h: number;
 }
 
 interface HoldingsGridProps {
-  holdings: Holding[]
+  holdings: Holding[];
 }
 
 export function HoldingsGrid({ holdings }: HoldingsGridProps) {
@@ -28,21 +28,32 @@ export function HoldingsGrid({ holdings }: HoldingsGridProps) {
         >
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h3 className="text-lg font-semibold text-white">{holding.name}</h3>
+              <h3 className="text-lg font-semibold text-white">
+                {holding.name}
+              </h3>
               <p className="text-sm text-gray-400">{holding.symbol}</p>
             </div>
-            <div className={`flex items-center ${holding.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {holding.change24h >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-              <span className="ml-1 text-sm">{Math.abs(holding.change24h)}%</span>
+            <div
+              className={`flex items-center ${holding.change24h >= 0 ? "text-green-400" : "text-red-400"}`}
+            >
+              {holding.change24h >= 0 ? (
+                <ArrowUpRight size={16} />
+              ) : (
+                <ArrowDownRight size={16} />
+              )}
+              <span className="ml-1 text-sm">
+                {Math.abs(holding.change24h)}%
+              </span>
             </div>
           </div>
-          <p className="text-2xl font-bold text-white mb-1">${holding.value.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-white mb-1">
+            ${holding.value.toLocaleString()}
+          </p>
           <p className="text-sm text-gray-400">
             {holding.amount} {holding.symbol}
           </p>
         </motion.div>
       ))}
     </div>
-  )
+  );
 }
-

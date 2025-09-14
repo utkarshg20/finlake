@@ -163,8 +163,12 @@ const Home = () => {
         source: params.source,
         target: params.target,
         type: "default",
-        ...(params.sourceHandle ? ({ sourceHandle: params.sourceHandle } as any) : {}),
-        ...(params.targetHandle ? ({ targetHandle: params.targetHandle } as any) : {}),
+        ...(params.sourceHandle
+          ? ({ sourceHandle: params.sourceHandle } as any)
+          : {}),
+        ...(params.targetHandle
+          ? ({ targetHandle: params.targetHandle } as any)
+          : {}),
       };
 
       updateEdges([...storage.edges, edge]);

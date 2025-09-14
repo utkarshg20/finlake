@@ -14,7 +14,11 @@ interface PortfolioDialogProps {
   portfolio: Record<string, number>;
 }
 
-export default function PortfolioDialog({ open, onOpenChange, portfolio }: PortfolioDialogProps) {
+export default function PortfolioDialog({
+  open,
+  onOpenChange,
+  portfolio,
+}: PortfolioDialogProps) {
   return (
     <ClientOnly>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -23,9 +27,14 @@ export default function PortfolioDialog({ open, onOpenChange, portfolio }: Portf
             <DialogTitle>Your Portfolio</DialogTitle>
             <div className="space-y-2 pt-3">
               {Object.entries(portfolio).map(([currency, amount]) => (
-                <div key={currency} className="flex justify-between items-center">
+                <div
+                  key={currency}
+                  className="flex justify-between items-center"
+                >
                   <span className="text-gray-400">{currency}</span>
-                  <span className="text-xl font-semibold text-white">{amount}</span>
+                  <span className="text-xl font-semibold text-white">
+                    {amount}
+                  </span>
                 </div>
               ))}
             </div>
@@ -34,4 +43,4 @@ export default function PortfolioDialog({ open, onOpenChange, portfolio }: Portf
       </Dialog>
     </ClientOnly>
   );
-} 
+}
