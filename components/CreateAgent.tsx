@@ -275,9 +275,9 @@ const CreateAgent = () => {
         pricing:
           agentData.visibility === "public"
             ? {
-                type: "monthly" as const,
-                amount: 99.99,
+                subscriptionFee: 99.99,
                 currency: "USD",
+                billingCycle: "monthly" as const,
                 trialDays: 7,
               }
             : undefined,
