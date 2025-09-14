@@ -104,6 +104,8 @@ class Database {
   }
 
   private loadFromStorage() {
+    if (typeof window === "undefined") return;
+
     try {
       const usersData = localStorage.getItem("finlake-users");
       const agentsData = localStorage.getItem("finlake-agents");
@@ -122,6 +124,8 @@ class Database {
   }
 
   private saveToStorage() {
+    if (typeof window === "undefined") return;
+
     try {
       localStorage.setItem("finlake-users", JSON.stringify(this.users));
       localStorage.setItem("finlake-agents", JSON.stringify(this.agents));
@@ -140,6 +144,8 @@ class Database {
   }
 
   private ensureSampleData() {
+    if (typeof window === "undefined") return;
+
     console.log("Ensuring sample data exists...");
     console.log("Current users count:", this.users.length);
 
@@ -150,6 +156,8 @@ class Database {
   }
 
   private clearAllDataAndReinitialize() {
+    if (typeof window === "undefined") return;
+
     console.log("Clearing all data and reinitializing...");
     this.users = [];
     this.agents = [];
@@ -557,8 +565,11 @@ class Database {
     this.subscriptions = sampleSubscriptions;
     this.portfolioHistory = portfolioHistory;
 
-    this.saveToStorage();
-    console.log("Sample data initialized");
+    // Only save to storage on client side
+    if (typeof window !== "undefined") {
+      this.saveToStorage();
+      console.log("Sample data initialized");
+    }
   }
 
   // User operations

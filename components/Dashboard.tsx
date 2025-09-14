@@ -116,9 +116,6 @@ export default function Dashboard() {
     (sum, agent) => sum + (agent.performance?.totalSubscribers || 0),
     0,
   );
-  const publicAgents = userAgents.filter(
-    (agent) => agent.visibility === "public",
-  ).length;
 
   // Recent activity (last 5 signals)
   const recentSignals = signals
@@ -189,7 +186,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Portfolio Performance Chart - Left Side (3/5 width) */}
           <div className="lg:col-span-3">
-            <Card className="bg-gray-900 border-gray-700 p-6 h-full">
+            <Card className="bg-gray-900 border-gray-700 p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Portfolio Performance</h2>
                 <div className="flex items-center space-x-2 text-sm text-gray-400">
@@ -199,12 +196,12 @@ export default function Dashboard() {
               </div>
 
               {chartData.length > 0 ? (
-                <div className="h-full">
+                <div className="w-full">
                   <svg
                     width="100%"
-                    height="100%"
+                    height="280"
                     viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                    className="w-full h-64"
+                    className="w-full"
                   >
                     {/* Gradient definition */}
                     <defs>
@@ -345,19 +342,6 @@ export default function Dashboard() {
                 </div>
                 <div className="p-3 bg-purple-500/20 rounded-lg">
                   <FiUsers className="w-6 h-6 text-purple-400" />
-                </div>
-              </div>
-            </Card>
-
-            {/* Public Agents */}
-            <Card className="bg-gray-900 border-gray-700 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm">Public Agents</p>
-                  <p className="text-2xl font-bold">{publicAgents}</p>
-                </div>
-                <div className="p-3 bg-orange-500/20 rounded-lg">
-                  <FiGlobe className="w-6 h-6 text-orange-400" />
                 </div>
               </div>
             </Card>
