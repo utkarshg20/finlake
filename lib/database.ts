@@ -348,7 +348,12 @@ class Database {
             totalSubscribers: 0,
           },
           tags: ["equities", "momentum", "RSI", "MACD", "high-frequency"],
-          pricing: undefined,
+          pricing: {
+            subscriptionFee: 5.0,
+            currency: "USD",
+            billingCycle: "monthly",
+            trialDays: 7,
+          },
         },
         {
           id: "agent_aryan_002",
@@ -448,9 +453,9 @@ class Database {
           },
           tags: ["arbitrage", "equities", "high-frequency", "automated"],
           pricing: {
-            type: "monthly",
-            amount: 5.0,
+            subscriptionFee: 5.0,
             currency: "USD",
+            billingCycle: "monthly",
             trialDays: 7,
           },
         },
@@ -498,9 +503,9 @@ class Database {
           },
           tags: ["momentum", "volatility", "technical-analysis", "stocks"],
           pricing: {
-            type: "monthly",
-            amount: 10.0,
+            subscriptionFee: 10.0,
             currency: "USD",
+            billingCycle: "monthly",
             trialDays: 14,
           },
         },
