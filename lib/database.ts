@@ -629,26 +629,28 @@ class Database {
       this.portfolioHistory = aryanPortfolioHistory;
 
       // Create sample subscriptions
-      const sampleSubscriptions: Subscription[] = [
+      const sampleSubscriptions: UserSubscription[] = [
         {
           id: "sub_001",
           userId: "user_sample_002",
           agentId: "agent_sample_001",
           status: "active",
-          startDate: "2024-02-01T00:00:00.000Z",
-          endDate: "2024-03-01T00:00:00.000Z",
-          price: 99.99,
-          currency: "USD",
+          subscribedAt: "2024-02-01T00:00:00.000Z",
+          expiresAt: "2024-03-01T00:00:00.000Z",
+          amountPaid: 99.99,
+          billingCycle: "monthly",
+          nextBillingDate: "2024-03-01T00:00:00.000Z",
         },
         {
           id: "sub_002",
           userId: "user_sample_003",
           agentId: "agent_sample_002",
           status: "active",
-          startDate: "2024-02-15T00:00:00.000Z",
-          endDate: "2024-03-15T00:00:00.000Z",
-          price: 149.99,
-          currency: "USD",
+          subscribedAt: "2024-01-15T00:00:00.000Z",
+          expiresAt: "2024-02-15T00:00:00.000Z",
+          amountPaid: 199.99,
+          billingCycle: "monthly",
+          nextBillingDate: "2024-02-15T00:00:00.000Z",
         },
       ];
 
