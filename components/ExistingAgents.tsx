@@ -57,20 +57,21 @@ const ExistingAgents = () => {
     }
 
     try {
-      const success = await subscribeToAgent(selectedAgent.id, paymentMethod);
+      const success = await subscribeToAgent(selectedAgent.id);
       if (success) {
         alert(
           `Successfully subscribed to ${selectedAgent.name}! You'll start receiving signals from this agent.`,
         );
         setShowPaymentModal(false);
         setSelectedAgent(null);
-        setPaymentMethod("");
+        // Refresh the page to update subscription status
+        window.location.reload();
       } else {
-        alert("Failed to subscribe to agent. Please try again.");
+        alert("Failed to subscribe. Please try again.");
       }
     } catch (error) {
-      console.error("Error subscribing to agent:", error);
-      alert("Failed to subscribe to agent. Please try again.");
+      console.error("Subscription error:", error);
+      alert("An error occurred during subscription. Please try again.");
     }
   };
 
