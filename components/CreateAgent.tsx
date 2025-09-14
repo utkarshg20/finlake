@@ -13,6 +13,7 @@ import {
   FiAlertCircle,
   FiInfo,
   FiShield,
+  FiZap,
 } from "react-icons/fi";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/contexts/AppContext";
@@ -23,7 +24,7 @@ interface AgentData {
   description: string;
   owner: string;
   strategyPrompt: string;
-  tradingLogicPrompt: string; // Add this new field
+  tradingLogicPrompt: string;
   strategyType: "burst_rule" | "sentiment_rule" | "manual";
 
   // Step 2: Parameters
@@ -47,193 +48,279 @@ interface AgentData {
   tradingDays: string[];
   status: "active" | "paused";
 
-  // Step 4: Visibility
+  // Step 4: Visibility & Publish
   visibility: "private" | "public";
   tags: string[];
+  termsAccepted: boolean;
+
+  // Additional fields for compatibility
+  parameters: any;
+  riskSettings: any;
+  pricing?: {
+    subscriptionFee: number;
+    currency: string;
+    billingCycle: string;
+    trialDays: number;
+  };
 }
 
-const CreateAgent = () => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isPublished, setIsPublished] = useState(false);
-  const [agentId, setAgentId] = useState<string>("");
+export default function CreateAgent() {
   const router = useRouter();
   const { createAgent, currentUser } = useApp();
-
-  const [agentData, setAgentData] = useState<AgentData>({
-    name: "",
-    description: "",
-    owner: currentUser?.email || "",
-    strategyPrompt: "",
-    tradingLogicPrompt: "", // Add this new field
-    strategyType: "burst_rule",
-    entityScope: "publisher",
-    windowMinutes: 30,
-    minBurst: 3.0,
-    minAvgSentiment: 0.2,
-    side: "buy",
-    minMessages: 3,
-    lookbackMinutes: 60,
-    minHeadlines: 3,
-    credibilityWeight: 0.5,
-    dedupCooldown: 30,
-    maxCandidates: 20,
-    perSignalNotional: 100,
-    maxSignalsPerHour: 5,
-    cooldownPerEntity: 30,
-    activeHours: "09:30-16:00",
-    tradingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    status: "active",
-    visibility: "private",
-    tags: [],
-  });
-
-  const [parseConfidence, setParseConfidence] = useState<
-    "low" | "medium" | "high"
-  >("medium");
+  const [currentStep, setCurrentStep] = useState(1);
+  const [agentId, setAgentId] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [testResults, setTestResults] = useState<any>(null);
 
-  const steps = [
-    {
-      id: 1,
-      title: "Basic Info",
-      description: "Agent details & strategy prompt",
-    },
-    { id: 2, title: "Configure Logic", description: "Rule parameters" },
-    { id: 3, title: "Risk & Schedule", description: "Trading controls" },
-    { id: 4, title: "Preview & Test", description: "Validate before publish" },
-    { id: 5, title: "Publish", description: "Make it live" },
-  ];
+  const [agentData, setAgentData] = useState<AgentData>({
+    // Step 1: Basic Info
+    name: "",
+    description: "",
+    owner: currentUser?.name || "",
+    strategyPrompt: "",
+    tradingLogicPrompt: "",
+    strategyType: "burst_rule",
 
-  const parseStrategyPrompt = (prompt: string) => {
-    // Simple parsing logic - in real app this would be more sophisticated
-    const burstKeywords = ["burst", "spike", "surge", "3x", "multiple"];
-    const sentimentKeywords = [
-      "sentiment",
-      "positive",
-      "negative",
-      "bullish",
-      "bearish",
-    ];
+    // Step 2: Parameters
+    entityScope: "ticker",
+    windowMinutes: 15,
+    minBurst: 0.8,
+    minAvgSentiment: 0.6,
+    side: "buy",
+    minMessages: 10,
+    lookbackMinutes: 30,
+    minHeadlines: 5,
+    credibilityWeight: 0.7,
+    dedupCooldown: 60,
+    maxCandidates: 5,
 
-    const hasBurst = burstKeywords.some((keyword) =>
-      prompt.toLowerCase().includes(keyword),
-    );
-    const hasSentiment = sentimentKeywords.some((keyword) =>
-      prompt.toLowerCase().includes(keyword),
-    );
+    // Step 3: Risk & Schedule
+    perSignalNotional: 1000,
+    maxSignalsPerHour: 4,
+    cooldownPerEntity: 60,
+    activeHours: "09:00-16:00",
+    tradingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    status: "active",
 
-    if (hasBurst && hasSentiment) {
-      setAgentData((prev) => ({ ...prev, strategyType: "burst_rule" }));
-      setParseConfidence("high");
-    } else if (hasBurst) {
-      setAgentData((prev) => ({ ...prev, strategyType: "burst_rule" }));
-      setParseConfidence("medium");
-    } else if (hasSentiment) {
-      setAgentData((prev) => ({ ...prev, strategyType: "sentiment_rule" }));
-      setParseConfidence("medium");
-    } else {
-      setAgentData((prev) => ({ ...prev, strategyType: "manual" }));
-      setParseConfidence("low");
+    // Step 4: Visibility & Publish
+    visibility: "private",
+    tags: [],
+    termsAccepted: false,
+
+    // Additional fields
+    parameters: {},
+    riskSettings: {},
+  });
+
+  // AI Analysis function
+  const analyzePromptWithAI = async (prompt: string) => {
+    if (!prompt.trim()) return;
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch("/api/analyze-agent-prompt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze prompt");
+      }
+
+      const analysis = await response.json();
+      setAiAnalysis(analysis);
+
+      // Only update the trading logic prompt, don't touch other fields
+      setAgentData((prev) => ({
+        ...prev,
+        tradingLogicPrompt: analysis.general_prompt,
+      }));
+    } catch (error) {
+      console.error("Error analyzing prompt:", error);
+      alert(
+        "Failed to analyze prompt with AI. Please fill out the form manually.",
+      );
+    } finally {
+      setIsAnalyzing(false);
     }
   };
+
+  // Get default tags based on strategy type
+  const getDefaultTags = (strategyType: string) => {
+    switch (strategyType) {
+      case "burst_rule":
+        return ["equities", "momentum", "high-frequency"];
+      case "sentiment_rule":
+        return ["sentiment", "news", "AI"];
+      default:
+        return ["equities", "trading"];
+    }
+  };
+
+  // Parse confidence level
+  const parseConfidence = "high";
 
   const generateRuleJson = () => {
     return {
       type: agentData.strategyType,
-      entity_kind: agentData.entityScope,
-      window_minutes: agentData.windowMinutes,
-      min_burst_z: agentData.minBurst,
-      min_avg_sent: agentData.minAvgSentiment,
+      entityScope: agentData.entityScope,
+      windowMinutes: agentData.windowMinutes,
+      minBurst: agentData.minBurst,
+      minAvgSentiment: agentData.minAvgSentiment,
       side: agentData.side,
-      size: { usd: agentData.perSignalNotional },
-      cooldown_minutes: agentData.cooldownPerEntity,
-      max_per_hour: agentData.maxSignalsPerHour,
-      active_hours: [agentData.activeHours],
-      days: agentData.tradingDays,
+      minMessages: agentData.minMessages,
+      lookbackMinutes: agentData.lookbackMinutes,
+      minHeadlines: agentData.minHeadlines,
+      credibilityWeight: agentData.credibilityWeight,
+      dedupCooldown: agentData.dedupCooldown,
+      maxCandidates: agentData.maxCandidates,
     };
   };
 
   const runQuickTest = () => {
-    // Mock test results
     setTestResults({
       signalsFound: 9,
       entities: [
         {
-          entity: "Reuters",
-          burst_z: 3.2,
-          avg_sent: 0.4,
-          count: 4,
-          lastSeen: "2h ago",
+          entity: "AAPL",
+          burst_z: 2.1,
+          avg_sent: 0.8,
+          count: 15,
+          lastSeen: "2m ago",
         },
         {
-          entity: "Bloomberg",
-          burst_z: 2.8,
-          avg_sent: 0.3,
-          count: 3,
-          lastSeen: "1h ago",
-        },
-        {
-          entity: "CNBC",
-          burst_z: 3.5,
-          avg_sent: 0.5,
-          count: 2,
-          lastSeen: "30m ago",
+          entity: "TSLA",
+          burst_z: 1.8,
+          avg_sent: 0.6,
+          count: 12,
+          lastSeen: "5m ago",
         },
       ],
       recommendations: [
         {
           side: "buy",
-          entity: "Reuters",
-          notional: 100,
-          rationale: "Burst detected with positive sentiment",
-        },
-        {
-          side: "buy",
-          entity: "Bloomberg",
-          notional: 100,
-          rationale: "High activity spike",
-        },
-        {
-          side: "buy",
-          entity: "CNBC",
-          notional: 100,
-          rationale: "Strong bullish signals",
+          entity: "AAPL",
+          notional: 1000,
+          rationale: "Strong bullish sentiment detected",
         },
       ],
     });
   };
 
-  // Add function to get default tags based on agent type
-  const getDefaultTags = (type: string) => {
-    if (type === "burst_rule") {
-      return ["momentum", "high-frequency", "automated"];
-    } else if (type === "sentiment_rule") {
-      return ["sentiment", "news", "AI"];
+  const handleNext = () => {
+    if (currentStep < 6) {
+      setCurrentStep(currentStep + 1);
     }
-    return ["trading", "automated"];
   };
 
+  const handlePrev = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // Update the handlePublish function with better debugging:
   const handlePublish = async () => {
+    if (!currentUser) {
+      alert("Please log in to create an agent");
+      return;
+    }
+
+    console.log("Starting agent creation process...");
+    console.log("Agent data:", agentData);
+    console.log("Current user email:", currentUser.email);
+
     try {
-      if (!currentUser) {
-        alert("Please log in to create an agent");
-        return;
+      // Look up the user id by email
+      console.log("Looking up user id for email:", currentUser.email);
+      const userResponse = await fetch("/api/get-user-by-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: currentUser.email }),
+      });
+
+      console.log("User lookup response status:", userResponse.status);
+
+      if (!userResponse.ok) {
+        const errorText = await userResponse.text();
+        console.error("Failed to get user id:", errorText);
+        throw new Error(`Failed to get user ID: ${errorText}`);
       }
 
-      // Validate required fields including the new trading logic prompt
-      if (
-        !agentData.name ||
-        !agentData.strategyPrompt ||
-        !agentData.tradingLogicPrompt
-      ) {
-        alert(
-          "Please fill in all required fields including the Trading Logic Prompt",
-        );
-        return;
+      const userData = await userResponse.json();
+      console.log("User lookup response data:", userData);
+
+      const userId = userData.user_id;
+      console.log("Retrieved user id:", userId);
+
+      if (!userId) {
+        throw new Error("No user id found for the current user");
       }
 
+      // Then, analyze the prompt with AI
+      let analysis = null;
+      if (agentData.tradingLogicPrompt.trim()) {
+        console.log("Analyzing prompt with AI...");
+        const response = await fetch("/api/analyze-agent-prompt", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ prompt: agentData.tradingLogicPrompt }),
+        });
+
+        if (response.ok) {
+          analysis = await response.json();
+          console.log("AI analysis result:", analysis);
+        } else {
+          console.log("AI analysis failed, using defaults");
+        }
+      }
+
+      // Prepare data for Supabase - ONLY the exact schema fields
+      const supabaseAgentData = {
+        owner_user_id: userId, // Use the looked up user id
+        agent_id: `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        general_prompt: agentData.tradingLogicPrompt,
+        type_of_equity_to_trade:
+          analysis?.type_of_equity_to_trade || "equities",
+        frequency_of_running: mapFrequencyToEnum(
+          analysis?.frequency_of_running || "medium",
+        ),
+        next_run_time:
+          analysis?.next_run_time ||
+          new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      };
+
+      console.log("Supabase data:", supabaseAgentData);
+
+      // Create agent in Supabase
+      console.log("Creating agent in Supabase...");
+      const supabaseResponse = await fetch("/api/create-agent-supabase", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(supabaseAgentData),
+      });
+
+      if (!supabaseResponse.ok) {
+        const errorText = await supabaseResponse.text();
+        console.error("Supabase error:", errorText);
+        throw new Error(`Failed to create agent in Supabase: ${errorText}`);
+      }
+
+      console.log("Supabase agent created successfully");
+
+      // Also create in local database for compatibility
       const agentDataToCreate = {
-        userId: currentUser?.id || "",
+        userId: currentUser.id,
         name: agentData.name,
         description: agentData.description,
         type:
@@ -244,38 +331,16 @@ const CreateAgent = () => {
         visibility: agentData.visibility,
         strategyPrompt: agentData.tradingLogicPrompt,
         tradingLogicPrompt: agentData.tradingLogicPrompt,
-        parameters: {
-          entityScope: agentData.entityScope,
-          windowMinutes: agentData.windowMinutes,
-          minBurst: agentData.minBurst,
-          minAvgSentiment: agentData.minAvgSentiment,
-          side: agentData.side,
-          minMessages: agentData.minMessages,
-          lookbackMinutes: agentData.lookbackMinutes,
-          minHeadlines: agentData.minHeadlines,
-          credibilityWeight: agentData.credibilityWeight,
-          dedupCooldown: agentData.dedupCooldown,
-          maxCandidates: agentData.maxCandidates,
-        },
-        riskSettings: {
-          perSignalNotional: agentData.perSignalNotional,
-          maxSignalsPerHour: agentData.maxSignalsPerHour,
-          cooldownPerEntity: agentData.cooldownPerEntity,
-          activeHours: agentData.activeHours,
-          tradingDays: agentData.tradingDays,
-        },
+        parameters: agentData.parameters,
+        riskSettings: agentData.riskSettings,
         tags:
           agentData.tags.length > 0
             ? agentData.tags
-            : getDefaultTags(
-                agentData.strategyType === "manual"
-                  ? "burst_rule"
-                  : agentData.strategyType,
-              ),
+            : getDefaultTags(agentData.strategyType),
         pricing:
           agentData.visibility === "public"
             ? {
-                subscriptionFee: 99.99,
+                subscriptionFee: agentData.pricing?.subscriptionFee || 0,
                 currency: "USD",
                 billingCycle: "monthly" as const,
                 trialDays: 7,
@@ -283,17 +348,20 @@ const CreateAgent = () => {
             : undefined,
       };
 
+      console.log("Creating agent in local database...");
       const newAgent = await createAgent(agentDataToCreate);
 
       if (newAgent) {
+        console.log("Local agent created successfully:", newAgent);
         setAgentId(newAgent.id);
-        setIsPublished(true);
+        setCurrentStep(6); // Move to success step
       } else {
-        alert("Failed to create agent. Please try again.");
+        console.error("Failed to create local agent");
+        alert("Failed to create agent in local database");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating agent:", error);
-      alert("Failed to create agent. Please try again.");
+      alert(`Failed to create agent: ${error.message}`);
     }
   };
 
@@ -319,10 +387,10 @@ const CreateAgent = () => {
 
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Short Description
+          Short Description *
         </label>
-        <Textarea
-          placeholder="Goes long when reputable publishers spike with positive sentiment."
+        <Input
+          placeholder="Detects bullish news bursts and executes buy signals"
           value={agentData.description}
           onChange={(e) =>
             setAgentData((prev) => ({ ...prev, description: e.target.value }))
@@ -333,12 +401,15 @@ const CreateAgent = () => {
 
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Owner
+          Owner *
         </label>
         <Input
+          placeholder="Your Name"
           value={agentData.owner}
-          disabled
-          className="bg-gray-700 border-gray-600 text-gray-400"
+          onChange={(e) =>
+            setAgentData((prev) => ({ ...prev, owner: e.target.value }))
+          }
+          className="bg-gray-800 border-gray-600 text-white"
         />
       </div>
 
@@ -347,31 +418,25 @@ const CreateAgent = () => {
           Strategy Prompt *
         </label>
         <Textarea
-          placeholder="Describe when the agent should act. Ex: Buy when publisher activity bursts (≥3x) and average sentiment is positive for the last 30–60 minutes."
+          placeholder="Describe what this agent should do..."
           value={agentData.strategyPrompt}
-          onChange={(e) => {
+          onChange={(e) =>
             setAgentData((prev) => ({
               ...prev,
               strategyPrompt: e.target.value,
-            }));
-            parseStrategyPrompt(e.target.value);
-          }}
+            }))
+          }
           className="bg-gray-800 border-gray-600 text-white h-32"
         />
-        <p className="text-xs text-gray-400 mt-1">
-          Describe when the agent should act. Ex: Buy when publisher activity
-          bursts (≥3x) and average sentiment is positive for the last 30–60
-          minutes.
-        </p>
       </div>
 
-      {/* New Trading Logic Prompt Field */}
+      {/* Trading Logic Prompt Field */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Trading Logic Prompt *
         </label>
         <Textarea
-          placeholder="Enter your core trading logic here. This will be used as the agent's primary decision-making algorithm. Keep this private and secure."
+          placeholder="Describe your trading strategy in detail..."
           value={agentData.tradingLogicPrompt}
           onChange={(e) =>
             setAgentData((prev) => ({
@@ -428,42 +493,6 @@ const CreateAgent = () => {
           >
             {parseConfidence}
           </span>
-        </div>
-        <Button
-          size="sm"
-          className="mt-2 text-xs"
-          onClick={() =>
-            setAgentData((prev) => ({
-              ...prev,
-              strategyType:
-                prev.strategyType === "manual" ? "burst_rule" : "manual",
-            }))
-          }
-        >
-          {agentData.strategyType === "manual"
-            ? "Switch to Basic"
-            : "Switch to Advanced"}
-        </Button>
-      </div>
-
-      <div className="bg-gray-800 p-4 rounded-lg">
-        <h4 className="text-sm font-medium text-white mb-2">Live Extraction</h4>
-        <div className="space-y-1 text-sm text-gray-300">
-          <div>
-            Type:{" "}
-            {agentData.strategyType === "burst_rule"
-              ? "Burst rule"
-              : "Sentiment rule"}
-          </div>
-          <div>Window: {agentData.windowMinutes} min</div>
-          <div>Min burst: {agentData.minBurst}</div>
-          <div>Min avg sentiment: {agentData.minAvgSentiment}</div>
-          <div>Side: {agentData.side}</div>
-          <div>Size: ${agentData.perSignalNotional} per signal</div>
-        </div>
-        <div className="mt-2 text-xs text-gray-400">
-          Confidence meter: {parseConfidence} (with inline tips if something is
-          missing)
         </div>
       </div>
     </div>
@@ -1168,7 +1197,7 @@ const CreateAgent = () => {
   );
 
   const renderCurrentStep = () => {
-    if (isPublished) {
+    if (agentId) {
       return renderSuccessScreen();
     }
 
@@ -1189,124 +1218,116 @@ const CreateAgent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-4xl mx-auto p-6">
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
-        {!isPublished && (
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Create AI Agent</h1>
-            <p className="text-gray-400">
-              Build your custom trading agent with intelligent automation
-            </p>
-          </div>
-        )}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Create AI Agent</h1>
+          <p className="text-gray-400">
+            Step {currentStep} of 5: {getStepTitle(currentStep)}
+          </p>
+        </div>
 
-        {/* Progress Steps - Hide when published */}
-        {!isPublished && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              {steps.map((step, index) => (
-                <div key={step.id} className="flex items-center">
-                  <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                      currentStep >= step.id
-                        ? "bg-white text-black"
-                        : "bg-gray-600 text-gray-400"
-                    }`}
-                  >
-                    {currentStep > step.id ? (
-                      <FiCheck className="w-4 h-4" />
-                    ) : (
-                      step.id
-                    )}
-                  </div>
-                  <div className="ml-3">
-                    <div
-                      className={`text-sm font-medium ${
-                        currentStep >= step.id ? "text-white" : "text-gray-400"
-                      }`}
-                    >
-                      {step.title}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {step.description}
-                    </div>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div
-                      className={`w-16 h-0.5 mx-4 ${
-                        currentStep > step.id ? "bg-white" : "bg-gray-600"
-                      }`}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex items-center space-x-2">
+            {[1, 2, 3, 4, 5].map((step) => (
+              <div
+                key={step}
+                className={`h-2 flex-1 rounded ${
+                  step <= currentStep ? "bg-white" : "bg-gray-700"
+                }`}
+              />
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Step Content */}
-        <Card className="bg-gray-900 border-gray-700 p-6 mb-6">
+        <Card className="bg-gray-900 border-gray-700 p-8 mb-8">
           <AnimatePresence mode="wait">
             <motion.div
-              key={isPublished ? "success" : currentStep}
+              key={currentStep}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              {renderCurrentStep()}
+              {currentStep === 1 && renderStep1()}
+              {currentStep === 2 && renderStep2()}
+              {currentStep === 3 && renderStep3()}
+              {currentStep === 4 && renderStep4()}
+              {currentStep === 5 && renderStep5()}
+              {currentStep === 6 && renderSuccessScreen()}
             </motion.div>
           </AnimatePresence>
         </Card>
 
         {/* Navigation */}
-        {!isPublished && (
+        {!agentId && (
           <div className="flex justify-between">
             <Button
-              onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
+              onClick={handlePrev}
               disabled={currentStep === 1}
-              className="bg-gray-600 hover:bg-gray-500 text-white"
+              className="bg-gray-800 hover:bg-gray-700 text-white disabled:opacity-50"
             >
               <FiChevronLeft className="w-4 h-4 mr-2" />
               Previous
             </Button>
 
-            <div className="flex gap-2">
-              {currentStep < 5 ? (
-                <Button
-                  onClick={() =>
-                    setCurrentStep((prev) => Math.min(5, prev + 1))
-                  }
-                  disabled={
-                    !agentData.name ||
-                    !agentData.strategyPrompt ||
-                    !agentData.tradingLogicPrompt
-                  }
-                  className="bg-white text-black hover:bg-gray-100"
-                >
-                  Next
-                  <FiChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handlePublish}
-                  disabled={
-                    !agentData.name ||
-                    !agentData.strategyPrompt ||
-                    !agentData.tradingLogicPrompt
-                  }
-                  className="bg-white text-black hover:bg-gray-100"
-                >
-                  Publish Agent
-                </Button>
-              )}
-            </div>
+            {currentStep < 5 ? (
+              <Button
+                onClick={handleNext}
+                className="bg-white text-black hover:bg-gray-100"
+              >
+                Next
+                <FiChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : currentStep === 5 ? (
+              <Button
+                onClick={handlePublish}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <FiCheck className="w-4 h-4 mr-2" />
+                Publish Agent
+              </Button>
+            ) : null}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// Helper function for step titles
+const getStepTitle = (step: number) => {
+  const titles = {
+    1: "Basic Information",
+    2: "Parameters",
+    3: "Risk & Schedule",
+    4: "Preview & Test",
+    5: "Publish Agent",
+    6: "Success",
+  };
+  return titles[step as keyof typeof titles] || "";
 };
 
-export default CreateAgent;
+const mapFrequencyToEnum = (frequency: string) => {
+  switch (frequency.toLowerCase()) {
+    case "high":
+    case "every few minutes":
+    case "every 5 minutes":
+    case "every 10 minutes":
+    case "every 15 minutes":
+      return "HOURLY"; // High frequency maps to HOURLY
+    case "medium":
+    case "hourly":
+    case "every hour":
+      return "HOURLY";
+    case "low":
+    case "daily":
+    case "every day":
+      return "DAILY";
+    default:
+      return "HOURLY"; // default fallback
+  }
+};

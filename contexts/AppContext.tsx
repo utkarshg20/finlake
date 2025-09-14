@@ -172,9 +172,38 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     setIsLoading(true);
 
     try {
+      // First, create user in local database
       const user = await db.registerUser(userData);
 
       if (user) {
+        // Then, create user in Supabase
+        try {
+          console.log("Creating user in Supabase...");
+          const supabaseResponse = await fetch("/api/create-user-on-register", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: userData.email,
+              username: userData.username,
+              // Removed name field since it doesn't exist in the table
+            }),
+          });
+
+          if (supabaseResponse.ok) {
+            const supabaseData = await supabaseResponse.json();
+            console.log("User created in Supabase:", supabaseData);
+          } else {
+            const errorText = await supabaseResponse.text();
+            console.error("Failed to create user in Supabase:", errorText);
+            // Don't fail registration if Supabase creation fails
+          }
+        } catch (supabaseError) {
+          console.error("Supabase user creation error:", supabaseError);
+          // Don't fail registration if Supabase creation fails
+        }
+
         setCurrentUser(user);
         setIsLoggedIn(true);
         loadUserData(user.id);
