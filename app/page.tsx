@@ -565,7 +565,6 @@ const Home = () => {
       <JoinRoomDialog
         isOpen={isJoinDialogOpen}
         onClose={() => setIsJoinDialogOpen(false)}
-        onJoin={handleJoinRoom}
       />
     </div>
   );
