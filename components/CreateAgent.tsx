@@ -232,15 +232,18 @@ const CreateAgent = () => {
         return;
       }
 
-      const newAgent = await createAgent({
-        userId: currentUser.id,
+      const agentDataToCreate = {
+        userId: currentUser?.id || "",
         name: agentData.name,
         description: agentData.description,
-        type: agentData.strategyType,
+        type:
+          agentData.strategyType === "manual"
+            ? "burst_rule"
+            : agentData.strategyType,
         status: agentData.status,
         visibility: agentData.visibility,
-        strategyPrompt: agentData.tradingLogicPrompt, // Add this field
-        tradingLogicPrompt: agentData.tradingLogicPrompt, // Include the new field
+        strategyPrompt: agentData.tradingLogicPrompt,
+        tradingLogicPrompt: agentData.tradingLogicPrompt,
         parameters: {
           entityScope: agentData.entityScope,
           windowMinutes: agentData.windowMinutes,
@@ -264,14 +267,23 @@ const CreateAgent = () => {
         tags:
           agentData.tags.length > 0
             ? agentData.tags
-            : getDefaultTags(agentData.strategyType),
-        performance: {
-          totalSignals: 0,
-          successRate: 0,
-          avgReturn: 0,
-          totalSubscribers: 0,
-        },
-      });
+            : getDefaultTags(
+                agentData.strategyType === "manual"
+                  ? "burst_rule"
+                  : agentData.strategyType,
+              ),
+        pricing:
+          agentData.visibility === "public"
+            ? {
+                type: "monthly" as const,
+                amount: 99.99,
+                currency: "USD",
+                trialDays: 7,
+              }
+            : undefined,
+      };
+
+      const newAgent = await createAgent(agentDataToCreate);
 
       if (newAgent) {
         setAgentId(newAgent.id);
