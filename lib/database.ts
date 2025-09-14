@@ -413,6 +413,8 @@ class Database {
           visibility: "public",
           createdAt: "2024-01-15T00:00:00.000Z",
           lastActive: new Date().toISOString(),
+          strategyPrompt:
+            "Monitor price differences across exchanges and execute arbitrage trades when spreads exceed threshold.",
           tradingLogicPrompt:
             "Monitor price differences across exchanges and execute arbitrage trades when spreads exceed threshold.",
           parameters: {
@@ -463,6 +465,8 @@ class Database {
           visibility: "public",
           createdAt: "2024-02-01T00:00:00.000Z",
           lastActive: new Date().toISOString(),
+          strategyPrompt:
+            "Identify momentum shifts in volatile markets using technical indicators and volume analysis.",
           tradingLogicPrompt:
             "Identify momentum shifts in volatile markets using technical indicators and volume analysis.",
           parameters: {
