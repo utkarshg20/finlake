@@ -52,6 +52,10 @@ interface AppContextType {
   // Portfolio state
   getPortfolioHistory: (userId: string, days?: number) => PortfolioHistory[];
 
+  // Dashboard state
+  dashboardData: any;
+  refreshDashboardData: () => void;
+
   // Loading state
   isLoading: boolean;
 }
